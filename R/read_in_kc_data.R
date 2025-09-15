@@ -9,6 +9,10 @@ library(readxl)
 library(ggplot2)
 library(janitor)
 library(naniar)
+library(patchwork)
+library(terra)
+library(tidyterra)
+library(geodata)
 
 ## Step 2 : I need to tell R where to my MS Excel
 
@@ -85,7 +89,7 @@ kc_mosq <- kc_mosq |>
 
 library(dplyr)
 
-kc_mosq |> 
+kc_mosq_clean <- kc_mosq |> 
   dplyr::select(-collection_month,
                 -date,
                 -unique_initials_of_health_area_and_village,
@@ -94,10 +98,10 @@ kc_mosq |>
                 -sample_transferred_kasai_central_to_kinshasa,
                 -comment) |> 
   group_by(village,house_number) |> 
-  summarise(total_count = sum(n_anopheles_collected),.groups = "drop")
+  summarise(total_count = sum(n_anopheles_collected),.groups = "drop") 
 
  
-message("Let's talk about this!")
+# message("Let's talk about this!")
 
 # Let's see how to join the location information (Sheet 4)
 
@@ -108,33 +112,49 @@ kc_location <- read_excel(latest_file, sheet = "location") |>
 # Sheet 4 contains "NA" values that's should remove 
 # After completing all collection gps data I should avoid to use theses two lines of code (111 and 112)
 
-kc_location <- read_excel(latest_file, sheet = "location") |> 
-  filter(!(is.na(lat_dd) & is.na(long_dd) & is.na(precision))) |> glimpse()
+#First way to filter
+# kc_location <- read_excel(latest_file, sheet = "location") |> 
+#filter(!(is.na(lat_dd))) 
+
+#second way to filter 
+kc_location_clean <- read_excel(latest_file, sheet = "location") |> 
+  glimpse()
 
 # A couple of field names are different here compared to the collection data, let's change them so that the join command is nice and simple
-kc_location <- kc_location |>
-  rename(
-    health_zone = zs,
-    health_area = as,
-    house_number = code_house
-  )
+#kc_location <- kc_location |>
+  # rename(
+  #   zs = health_zone,
+  #   as = health_area,
+  #   code_house = house_number
+  # )
 
 kc_df <- left_join(
-  kc_mosq,
-  kc_location,
-  by = c("health_zone", "health_area", "house_number")
+  kc_mosq_clean,
+  kc_location_clean,
+  by = c("village", "house_number")
 ) |>
   select(
-    -c(comment, precision_m)
-  )
+    -c(precision)
+  ) |> 
+  filter(!(is.na(lat_dd) & is.na(long_dd)))
+
 
 # Step 5: might be nice to add a summary data output of plots in space, time, and a table of NAs?
-library(patchwork)
-library(terra)
-library(tidyterra)
+# library(patchwork)
+# library(terra)
+# library(tidyterra)
+
+# this shp looks incomplete
+#drc <- vect("V:/1. Vector Atlas and my PhD at LSTM/1. My PhD with LSTM/1. LSTM PhD work project/10. kc_shapfiles/rdc_aires-de-sante/RDC_Aires de santé.shp")
+
+# get administrative area for a country
+drc_shp <-gadm(
+  country = "COD",
+  level= 0,
+  path= "data/downloads"
+)
 
 
-drc <- vect("~/pCloud Drive/R/data/va/vic/gadm/gadm41_COD_0_pk_low.rds")
 
 kc <- vect("~/pCloud Drive/R/data/va/vic/gadm/gadm41_COD_1_pk.rds") |>
   filter(
