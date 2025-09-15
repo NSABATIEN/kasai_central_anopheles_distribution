@@ -13,7 +13,7 @@ library(naniar)
 ## Step 2 : I need to tell R where to my MS Excel
 
 # Make a path for David's computer
-dhd_data_path <- "~/pCloud Drive/R/data/va/vic/kc/raw"
+# dhd_data_path <- "~/pCloud Drive/R/data/va/vic/kc/raw"
 vic_data_path <- "V:/1. Vector Atlas and my PhD at LSTM/1. My PhD with LSTM/1. LSTM PhD work project/1.kc_entomo_database"
 
 # Make a path for Vic's computer
@@ -56,6 +56,7 @@ read_excel(latest_file, sheet = 1) |> glimpse()
 # Sheet 4 looks like it has the location info
 read_excel(latest_file, sheet = "location") |> glimpse()
 
+
 ## Step 3 : Now let read in collection data from MS Excel. # Vic had already fixed all the column names, but if not we could use a call to janitor::clean_names(kc_mosq). Let's show how anyway
 
 kc_mosq <- read_excel(latest_file, sheet = "data") |>
@@ -77,8 +78,11 @@ kc_mosq <- kc_mosq |>
   glimpse()
 
 # We probably don't want repeat month data, Vic, so what do we want?  Also, we don't need all of these fields, which ones do we need
+# Vic comments : we need to keep the variables which make sense for my  objective 1 and composition model 
 
 # Step 4: Make a summary of the data that makes sense for the Anopheles distribution and composition model, and drop the fields that won't be useful for the modelling steps
+# To do that, I can use dplyr package
+
 library(dplyr)
 
 kc_mosq |> 
@@ -95,18 +99,24 @@ kc_mosq |>
  
 message("Let's talk about this!")
 
-# Let's see how to join the location information
+# Let's see how to join the location information (Sheet 4)
 
 kc_location <- read_excel(latest_file, sheet = "location") |>
   clean_names() |>
   glimpse()
 
+# Sheet 4 contains "NA" values that's should remove 
+# After completing all collection gps data I should avoid to use theses two lines of code (111 and 112)
+
+kc_location <- read_excel(latest_file, sheet = "location") |> 
+  filter(!(is.na(lat_dd) & is.na(long_dd) & is.na(precision))) |> glimpse()
+
 # A couple of field names are different here compared to the collection data, let's change them so that the join command is nice and simple
 kc_location <- kc_location |>
   rename(
-    house_number = code_house,
     health_zone = zs,
-    health_area = as
+    health_area = as,
+    house_number = code_house
   )
 
 kc_df <- left_join(
