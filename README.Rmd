@@ -15,7 +15,7 @@
 3.1. Download environmental covariates (done)
 - Bioclimatic variables downloaded in geodata package using WorldClim function
 - Landcover layers downloaded in geodata package using global_landcover function
-3.2. Crop both covariates (climate and landcover) to the extend around KC (not yet/need support to define )
+3.2. Crop both covariates (climate and landcover) to the extend around KC (not yet)
 3.3. Link both covariates (climate and landcover) to location data (not yet)
 3.4. Plot the landcover _crop (not yet)
 
