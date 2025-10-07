@@ -1,12 +1,3 @@
----
-editor_options:
-  markdown:
-    wrap: 72
-output:
-  html_document:
-    df_print: paged
----
-
 # **Vic's Roadmap objective 1**
 
 This roadmap outlines the key steps to be completed for Objective 1,
