@@ -10,7 +10,7 @@ output:
 # **Vic's Roadmap objective 1**
 
 This roadmap outlines the key steps to be completed for Objective 1,
-which focuses on geospatial modeling of vector species distribution
+which focuses on geospatial modeling of malaria vector species distribution
 across Kasaï-Central in Democratic Republic of the Congo
 
 ## **Step 1 : Load packages (_done_)**
