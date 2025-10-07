@@ -1,8 +1,6 @@
 # **Vic’s Roadmap objective 1**
 
-This roadmap outlines the key steps to be completed for Objective 1,
-which focuses on geospatial modeling of malaria vector species
-distribution across Kasaï-Central in Democratic Republic of the Congo
+This roadmap outlines the key steps to be completed for Objective 1, which focuses on the development of a granular geospatial model of malaria vector species based on indoor household entomological collections across Kasaï-Central in Democratic Republic of the Congo
 
 ## **Step 1 : Load packages (*done*)**
 
