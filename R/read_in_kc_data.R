@@ -7,12 +7,14 @@
 library(tidyverse)
 library(readxl)
 library(ggplot2)
+library(stats)
 library(janitor)
 library(naniar)
 library(patchwork)
 library(terra)
 library(tidyterra)
 library(geodata)
+library(dplyr)
 
 ## Step 2 : I need to tell R where to my MS Excel
 
@@ -45,7 +47,9 @@ files <- list.files(
 )
 
 # Find the most recent by modification time
+
 latest_file <- files[which.max(file.info(files)$mtime)]
+
 # need to understand the concept of index (vic)
 # files[which.max(file.info(files)$size)] #(this ligne of code is not concern my own code but it's can help me to understand the concept about file info wich is can be the size, mtime, ctime or actime :keep it in mind) 
 
@@ -54,10 +58,13 @@ latest_file <- files[which.max(file.info(files)$mtime)]
 excel_sheets(latest_file)
 
 # Sheet 1 is the collection data, as the name suggests
+
 read_excel(latest_file, sheet = 1) |> glimpse()
+
 # need to learn what glimpse doing  #(glimpse is the function)
 
 # Sheet 4 looks like it has the location info
+
 read_excel(latest_file, sheet = "location") |> glimpse()
 
 
@@ -87,7 +94,7 @@ kc_mosq <- kc_mosq |>
 # Step 4: Make a summary of the data that makes sense for the Anopheles distribution and composition model, and drop the fields that won't be useful for the modelling steps
 # To do that, I can use dplyr package
 
-library(dplyr)
+# library(dplyr) # already done above
 
 kc_mosq_clean <- kc_mosq |> 
   dplyr::select(-collection_month,
@@ -117,6 +124,7 @@ kc_location <- read_excel(latest_file, sheet = "location") |>
 #filter(!(is.na(lat_dd))) 
 
 #second way to filter 
+
 kc_location_clean <- read_excel(latest_file, sheet = "location") |> 
   glimpse()
 
@@ -148,20 +156,48 @@ kc_df <- left_join(
 #drc <- vect("V:/1. Vector Atlas and my PhD at LSTM/1. My PhD with LSTM/1. LSTM PhD work project/10. kc_shapfiles/rdc_aires-de-sante/RDC_Aires de santé.shp")
 
 # get administrative area for a country
+
+
 drc_shp <-gadm(
   country = "COD",
   level= 0,
   path= "data/downloads"
 )
 
+drc_shp_prv <-gadm(
+  country = "COD",
+  level= 1,
+  path= "data/downloads"
+)
 
+# If I work with multiples provinces in DRC # use in function 
+# drc_shp_prv |> 
+#   filter(
+#     NAME_1 %in% c("Kasaï-Central","Haut-Uele","Kongo-Central"),
+#   ) 
+# exemple 
 
-kc <- vect("~/pCloud Drive/R/data/va/vic/gadm/gadm41_COD_1_pk.rds") |>
+# For one province 
+
+kc<- drc_shp_prv |> 
   filter(
     NAME_1 == "Kasaï-Central"
-  )
+      )
+  
 
 missing_data <- naniar::gg_miss_var(kc_df, show_pct = TRUE)
+
+# before the : : is a package, # after the : : is a function
+# read : spatial raster and vector data
+# sf is the package for vector data
+# vector data can be any thing is represent by the point, line, or polygon 
+# spatial raster it's a grid 
+# what kind of object is location? is ggplot object
+# rm function
+# ls function
+# use this function rm(list=ls()) in case you want to see what's, 
+# the restard R session with this cmd+shift +f10
+
 
 plot_kc_df <- filter(kc_df, !is.na(long_dd)) |>
   sf::st_as_sf(
@@ -171,7 +207,7 @@ plot_kc_df <- filter(kc_df, !is.na(long_dd)) |>
 
 location <- ggplot() +
   geom_spatvector(data = kc) +
-  geom_sf(data = plot_kc_df)
+  geom_sf(data = plot_kc_df) +
 theme_minimal()
 
 missing_data + location + plot_layout(ncol = 1)

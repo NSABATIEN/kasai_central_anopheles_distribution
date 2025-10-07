@@ -1,26 +1,44 @@
-# Vic's Roadmap objective 1
+---
+editor_options:
+  markdown:
+    wrap: 72
+output:
+  html_document:
+    df_print: paged
+---
 
-“This roadmap outlines the key steps to be completed for Objective 1, which focuses on geospatial modeling of vector species distribution across Kasaï-Central.”
+# **Vic's Roadmap objective 1**
 
-## Step 1 : Load packages (done)
-1.1. Load all packages required
-## Step 2 : Read in KC data (done)
-2.1. Define a path and find the latest Excel file (done)
-2.2. Read in Excel sheets and clean the data (done)
-2.3. Clean and summarize collection data (done)
-2.4. Clean and summarize location data (done)
-2.5. Join collection data and location data (done)
-2.6. Preliminary Spatial visualization and quality check (done)
-## Step 3 : Prepare environmental covariates (in progress)
-3.1. Download environmental covariates (done)
-- Bioclimatic variables downloaded in geodata package using WorldClim function
-- Landcover layers downloaded in geodata package using global_landcover function
-3.2. Crop both covariates (climate and landcover) to the extend around KC (not yet)
-3.3. Link both covariates (climate and landcover) to location data (not yet)
-3.4. Plot the landcover _crop (not yet)
+This roadmap outlines the key steps to be completed for Objective 1,
+which focuses on geospatial modeling of vector species distribution
+across Kasaï-Central in Democratic Republic of the Congo
 
-## Step 4 : Fit the model (binomial model for presence/absence data, or poisson model for count data) " not yet" 
+## **Step 1 : Load packages (_done_)**
 
-## Step 5 : Model Diagnostics Using DHARMa  "not yet"
+* Load all packages required
 
-## Step 6 : Loading model and conducting env_ (MESS) "not yet"
+## **Step 2 : Read in KC data (_done_)** 
+
+* Define a path and find the latest Excel file (_done_) 
+* Read in Excel sheets and clean the data (_done_) 
+* Clean and summarize collection data (_done_) 
+* Clean and summarize location data (_done_) 
+* Join collection data and location data (_done_) 
+* Preliminary Spatial visualization and quality check (_done_)
+
+## **Step 3 : Prepare environmental covariates (_in progress_)** 
+
+* Download environmental covariates (_done_) :
+  - Bioclimatic variables downloaded in geodata package using WorldClim function ✓  
+  - Landcover layers downloaded in geodata package using global_landcover function ✓
+* Crop both covariates (climate and landcover) to the extend around KC (_not yet_)
+* Link both covariates (climate and landcover) to location data (_not yet_)
+* Plot the landcover \_crop (_not yet_)
+
+## **Step 4 : Fit the model**
+
+Binomial model for presence/absence data, or poisson model for count data will be using (_not yet_)
+
+## **Step 5 : Model Diagnostics Using DHARMa (_not yet_)**
+
+## **Step 6 : Loading model and conducting env\_ (MESS) (_not yet_)**
