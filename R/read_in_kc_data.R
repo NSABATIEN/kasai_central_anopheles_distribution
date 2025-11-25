@@ -15,12 +15,13 @@ library(terra)
 library(tidyterra)
 library(geodata)
 library(dplyr)
+library(forcats)
 
 ## Step 2 : I need to tell R where to my MS Excel
 
 # Make a path for David's computer
 # dhd_data_path <- "~/pCloud Drive/R/data/va/vic/kc/raw"
-vic_data_path <- "V:/1. Vector Atlas and my PhD at LSTM/1. My PhD with LSTM/1. LSTM PhD work project/1.kc_entomo_database"
+vic_data_path <- "V:/1. Vic's PhD Journey 2025/1. Vic's PhD Journey 2025/1. LSTM PhD work project/1.kc_entomo_database"
 
 # Make a path for Vic's computer
 
@@ -107,10 +108,65 @@ kc_mosq_clean <- kc_mosq |>
   group_by(village,house_number) |> 
   summarise(total_count = sum(n_anopheles_collected),.groups = "drop") 
 
+# p_month <- kc_plot |>
+#   ggplot(aes(x = collection_month, y = n_anopheles_collected)) +
+#   geom_boxplot()  +
+#   labs(title = "Mosquito count per collection month in Kasaï-Central",
+#     x = "collection_month", y = "n_anopheles_collected") +
+#   theme()
+# plot(p_month)
+# 
+# p_zone_month <- kc_plot_ord |>
+#   ggplot(aes(y = health_zone, x = n_anopheles_collected)) +
+#   geom_boxplot() +
+#   facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
+#   labs(title = "kc_data by health zone and collection_month",
+#        x = "n_anopheles_collected", y = "health_zone") +
+#   theme() 
+# plot(p_zone_month)
  
 # message("Let's talk about this!")
 
 # Let's see how to join the location information (Sheet 4)
+
+# 23.10.2025 : let have a look on species
+kc_species <- read_excel(latest_file, sheet = "species") |>
+  clean_names()
+
+kc_taxon_plot <- kc_species |>
+  dplyr::filter(!is.na(identification_taxon)) |>
+  dplyr::mutate(
+    collection_month = factor(collection_month,
+                              levels = c("month_1","month_2","month_3","month_4")),
+    health_zone = as.factor(health_zone)
+  ) |>
+  dplyr::select(health_zone, collection_month, identification_taxon)
+
+p_taxon_counts <- kc_taxon_plot |>
+  ggplot(aes(x = health_zone, fill = identification_taxon)) +
+  geom_bar() +
+  coord_flip() +
+  facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
+  labs(
+    title = "Identified mosquito species by health zone and collection month",
+    x = "health_zone",
+    y = "Number of individuals per species per village per month",
+    fill = "Taxon"
+  ) +
+  theme_grey(base_size = 11) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+p_taxon_counts <- p_taxon_counts +
+  theme(
+    axis.text.y = element_text(size = 6),    # smaller labels
+    strip.text = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 8),
+    legend.title = element_text(face = "bold")
+  )
+
+plot(p_taxon_counts)
 
 kc_location <- read_excel(latest_file, sheet = "location") |>
   clean_names() |>
@@ -136,15 +192,27 @@ kc_location_clean <- read_excel(latest_file, sheet = "location") |>
   #   code_house = house_number
   # )
 
+# kc_df <- left_join(
+#   kc_mosq_clean,
+#   kc_location_clean,
+#   by = c("village", "house_number")
+# ) |>
+#   select(
+#     -c(precision)
+#   ) |> 
+#   filter(!(is.na(lat_dd) & is.na(long_dd)))
+
 kc_df <- left_join(
   kc_mosq_clean,
   kc_location_clean,
   by = c("village", "house_number")
 ) |>
-  select(
-    -c(precision)
-  ) |> 
-  filter(!(is.na(lat_dd) & is.na(long_dd)))
+  select(-precision) |>
+  mutate(
+    status = ifelse(is.na(lat_dd) | is.na(long_dd),
+                    "To be georeferenced",
+                    "Georeferenced")
+  )
 
 
 # Step 5: might be nice to add a summary data output of plots in space, time, and a table of NAs?
