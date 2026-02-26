@@ -1,9 +1,6 @@
 # Read in field data from MS Excel
 
-## Step 1: I need to load R packages that I will use in my code
-
-### Let load the packages
-
+# 1. load all required packages
 library(tidyverse)
 library(readxl)
 library(ggplot2)
@@ -16,15 +13,16 @@ library(tidyterra)
 library(geodata)
 library(dplyr)
 library(forcats)
+library(lubridate)
+#
 
-## Step 2 : I need to tell R where to my MS Excel
+# 2. Tell R where to find the Excel file
+## Make a path for David's computer
+## dhd_data_path <- "~/pCloud Drive/R/data/va/vic/kc/raw"
 
-# Make a path for David's computer
-# dhd_data_path <- "~/pCloud Drive/R/data/va/vic/kc/raw"
-vic_data_path <- "V:/1. Vic's PhD Journey 2025/1. Vic's PhD Journey 2025/1. LSTM PhD work project/1.kc_entomo_database"
+vic_data_path <- "V:/1. Vic's PhD Journey 2025/1. Vic's PhD Journey 2025/LSTM PhD work project/1.kc_entomo_database"
 
 # Make a path for Vic's computer
-
 # get_data_folder_path <- function(user = c("dhd", "vic", "ger", "nick")) {
 #   if (user == "dhd") {
 #     path <- dhd_data_path
@@ -33,13 +31,11 @@ vic_data_path <- "V:/1. Vic's PhD Journey 2025/1. Vic's PhD Journey 2025/1. LSTM
 #   }
 #   return(path)
 # }
-
 # data_folder_path <- get_data_folder_path("dhd")
 
 data_folder_path <- vic_data_path
 
-# Get all Excel files
-
+# 3. Get all Excel files in a folder
 
 files <- list.files(
   data_folder_path,
@@ -47,13 +43,13 @@ files <- list.files(
   full.names = TRUE
 )
 
-# Find the most recent by modification time
+# 4. Select the latest Excel file by modification time
 
 latest_file <- files[which.max(file.info(files)$mtime)]
 
 # need to understand the concept of index (vic)
-# files[which.max(file.info(files)$size)] #(this ligne of code is not concern my own code but it's can help me to understand the concept about file info wich is can be the size, mtime, ctime or actime :keep it in mind) 
-
+# Note: files[which.max(file.info(files)$size)] #(this line of code is not concern my own code but I keep it as an example to help the understanding of indexing + `file.info about the`size, mtime, ctime, atime)
+# files[which.max(file.info(files)$size)]  # select the largest file
 # Is it a multisheet file?
 
 excel_sheets(latest_file)
@@ -62,14 +58,12 @@ excel_sheets(latest_file)
 
 read_excel(latest_file, sheet = 1) |> glimpse()
 
-# need to learn what glimpse doing  #(glimpse is the function)
-
 # Sheet 4 looks like it has the location info
 
 read_excel(latest_file, sheet = "location") |> glimpse()
 
 
-## Step 3 : Now let read in collection data from MS Excel. # Vic had already fixed all the column names, but if not we could use a call to janitor::clean_names(kc_mosq). Let's show how anyway
+## 5. Now let read in collection data from MS Excel. # Vic had already fixed all the column names, but if not we could use a call to janitor::clean_names(kc_mosq). Let's show how anyway
 
 kc_mosq <- read_excel(latest_file, sheet = "data") |>
   clean_names()
@@ -89,12 +83,11 @@ kc_mosq <- kc_mosq |>
   ) |> #
   glimpse()
 
-# We probably don't want repeat month data, Vic, so what do we want?  Also, we don't need all of these fields, which ones do we need
-# Vic comments : we need to keep the variables which make sense for my  objective 1 and composition model 
+# Note : We probably don't want repeat month data, Vic, so what do we want?  Also, we don't need all of these fields, which ones do we need
+# Note : we need to keep the variables which make sense for my  objective 1 and composition model 
 
-# Step 4: Make a summary of the data that makes sense for the Anopheles distribution and composition model, and drop the fields that won't be useful for the modelling steps
+# 6. Make a summary of the data that makes sense for the Anopheles distribution and composition model, and drop the fields that won't be useful for the modelling steps
 # To do that, I can use dplyr package
-
 # library(dplyr) # already done above
 
 kc_mosq_clean <- kc_mosq |> 
@@ -108,66 +101,70 @@ kc_mosq_clean <- kc_mosq |>
   group_by(village,house_number) |> 
   summarise(total_count = sum(n_anopheles_collected),.groups = "drop") 
 
-# p_month <- kc_plot |>
-#   ggplot(aes(x = collection_month, y = n_anopheles_collected)) +
-#   geom_boxplot()  +
-#   labs(title = "Mosquito count per collection month in Kasaï-Central",
-#     x = "collection_month", y = "n_anopheles_collected") +
-#   theme()
-# plot(p_month)
-# 
-# p_zone_month <- kc_plot_ord |>
-#   ggplot(aes(y = health_zone, x = n_anopheles_collected)) +
-#   geom_boxplot() +
-#   facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
-#   labs(title = "kc_data by health zone and collection_month",
-#        x = "n_anopheles_collected", y = "health_zone") +
-#   theme() 
-# plot(p_zone_month)
- 
-# message("Let's talk about this!")
+p_month <- kc_mosq |>
+  ggplot(aes(x = collection_month, y = n_anopheles_collected)) +
+  geom_boxplot()  +
+  labs(title = "Mosquito count per collection month in Kasaï-Central",
+    x = "collection_month", y = "n_anopheles_collected") +
+  theme()
+plot(p_month)
 
-# Let's see how to join the location information (Sheet 4)
+## Monthly evolution of mosquito count
 
-# 23.10.2025 : let have a look on species
+p_month <- kc_mosq |>
+  group_by(collection_month) |>
+  summarise(total_count = sum(n_anopheles_collected, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = collection_month, y = total_count, group = 1)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(
+    breaks = seq(0, 1200, by = 200),
+    limits = c(0, 1200)
+  ) +
+  labs(
+    title = "Total mosquito count per collection month in Kasaï-Central",
+    x = "collection_month",
+    y = "Total n_anopheles_collected"
+  ) +
+  theme()
+
+p_month
+
+
+## Plot per zone per month
+
+p_zone_month <-kc_mosq |>
+  ggplot(aes(y = health_zone, x = n_anopheles_collected)) +
+  geom_boxplot() +
+  facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
+  labs(title = "kc_data by health zone and collection_month",
+       x = "n_anopheles_collected", y = "health_zone") +
+  theme()
+plot(p_zone_month)
+
+
+# Species visualization 
+
 kc_species <- read_excel(latest_file, sheet = "species") |>
   clean_names()
 
-kc_taxon_plot <- kc_species |>
-  dplyr::filter(!is.na(identification_taxon)) |>
-  dplyr::mutate(
-    collection_month = factor(collection_month,
-                              levels = c("month_1","month_2","month_3","month_4")),
-    health_zone = as.factor(health_zone)
-  ) |>
-  dplyr::select(health_zone, collection_month, identification_taxon)
+kc_taxon_summary <- kc_species |>
+  filter(!is.na(identification_taxon)) |>
+  group_by(collection_month, health_zone, identification_taxon) |>
+  summarise(n = n(), .groups = "drop")
 
-p_taxon_counts <- kc_taxon_plot |>
-  ggplot(aes(x = health_zone, fill = identification_taxon)) +
-  geom_bar() +
+p_taxon <- ggplot(kc_taxon_summary,
+                  aes(x = health_zone, y = n, fill = identification_taxon)) +
+  geom_col() +
   coord_flip() +
-  facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
-  labs(
-    title = "Identified mosquito species by health zone and collection month",
-    x = "health_zone",
-    y = "Number of individuals per species per village per month",
-    fill = "Taxon"
-  ) +
-  theme_grey(base_size = 11) +
+  facet_wrap(~ collection_month, ncol = 3, scales = "free_x") +
   theme(
-    strip.text = element_text(face = "bold"),
-    legend.position = "bottom"
-  )
-p_taxon_counts <- p_taxon_counts +
-  theme(
-    axis.text.y = element_text(size = 6),    # smaller labels
-    strip.text = element_text(size = 10, face = "bold"),
-    legend.text = element_text(size = 8),
-    legend.title = element_text(face = "bold")
+    axis.text.y = element_text(size = 5)  
   )
 
-plot(p_taxon_counts)
+p_taxon
 
+## Join location information
 kc_location <- read_excel(latest_file, sheet = "location") |>
   clean_names() |>
   glimpse()
@@ -184,7 +181,7 @@ kc_location <- read_excel(latest_file, sheet = "location") |>
 kc_location_clean <- read_excel(latest_file, sheet = "location") |> 
   glimpse()
 
-# A couple of field names are different here compared to the collection data, let's change them so that the join command is nice and simple
+;# A couple of field names are different here compared to the collection data, let's change them so that the join command is nice and simple
 #kc_location <- kc_location |>
   # rename(
   #   zs = health_zone,
@@ -279,3 +276,6 @@ location <- ggplot() +
 theme_minimal()
 
 missing_data + location + plot_layout(ncol = 1)
+
+kc_df |>
+  filter(lat_dd > 0)
