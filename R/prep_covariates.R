@@ -111,3 +111,42 @@ plot(pcs_bioclim_keep)
 ## BIO1: Annual Mean Temperature, BIO2: Mean Diurnal Range (Mean of monthly (max temp - min temp)), BIO3: Isothermality (BIO2/BIO7) (×100) and BIO4: Temperature Seasonality (standard deviation ×100) were the only variable explaining 95% of the variance
 
 # Now let do the same for landcover
+# drop the layers with no variance (all 0% cover for snow, mangroves, moss)
+landcover_vals <- landcover_crop %>%
+  terra::extract(
+    select(coords, long_dd, lat_dd),
+    ID = FALSE
+  )
+landcover_layers_varying <- which(apply(landcover_vals, 2, var) != 0)
+landcover_crop_sub <- landcover_crop[[landcover_layers_varying]]
+
+# and empirical-logit transform it for more normality in the resulting variables
+# (nicer plots at least). Assume the number of trials from the number of decimal
+# places recorded in the raster (4)
+emplogit_fraction <- function(fraction, trials = 1e4) {
+  successes <- trials * fraction
+  failures <- trials - successes
+  log((successes + 0.5) / (failures + 0.5))
+}
+landcover_crop_sub_emplogit <- emplogit_fraction(landcover_crop_sub)
+
+8 <- landcover_crop_sub_emplogit %>%
+  terra::extract(
+    select(coords, long_dd, lat_dd),
+    ID = FALSE
+  ) %>%
+  prcomp(center = TRUE,
+         scale = TRUE)
+
+summary(pca_landcover)
+
+# keep those explaining 90% of the variance
+sry_landcover <- summary(pca_landcover)
+sry_landcover
+n_pcs_keep_landcover <- min(which(sry_landcover$importance["Cumulative Proportion", ] > 0.9))
+n_pcs_keep_landcover
+sry_landcover$importance[, 1:n_pcs_keep_landcover]
+pcs_landcover <- predict(landcover_crop_sub_emplogit, pca_landcover)
+pcs_landcover_keep <- pcs_landcover[[seq_len(n_pcs_keep_landcover)]]
+names(pcs_landcover_keep) <- paste0("landcover_", tolower(names(pcs_landcover_keep)))
+plot(pcs_landcover_keep)
