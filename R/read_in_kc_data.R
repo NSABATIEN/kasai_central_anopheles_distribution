@@ -181,7 +181,7 @@ kc_location <- read_excel(latest_file, sheet = "location") |>
 kc_location_clean <- read_excel(latest_file, sheet = "location") |> 
   glimpse()
 
-;# A couple of field names are different here compared to the collection data, let's change them so that the join command is nice and simple
+# A couple of field names are different here compared to the collection data, let's change them so that the join command is nice and simple
 #kc_location <- kc_location |>
   # rename(
   #   zs = health_zone,
@@ -279,3 +279,8 @@ missing_data + location + plot_layout(ncol = 1)
 
 kc_df |>
   filter(lat_dd > 0)
+
+points_sf |>
+  filter(outside_kc) |>
+  st_drop_geometry() |>
+  View()
