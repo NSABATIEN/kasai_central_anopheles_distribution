@@ -144,8 +144,7 @@ summary(pca_landcover)
 sry_landcover <- summary(pca_landcover)
 sry_landcover
 n_pcs_keep_landcover <- min(which(sry_landcover$importance["Cumulative Proportion", ] > 0.9))
-n_pcs_keep_landcover
-sry_landcover$importance[, 1:n_pcs_keep_landcover]
+
 pcs_landcover <- predict(landcover_crop_sub_emplogit, pca_landcover)
 pcs_landcover_keep <- pcs_landcover[[seq_len(n_pcs_keep_landcover)]]
 names(pcs_landcover_keep) <- paste0("landcover_", tolower(names(pcs_landcover_keep)))
