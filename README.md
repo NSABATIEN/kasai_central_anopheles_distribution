@@ -22,8 +22,7 @@ This roadmap outlines the key steps to be completed for Objective 1, which focus
         WorldClim function ✓  
     -   Landcover layers downloaded in geodata package using
         global\_landcover function ✓
--   Crop both covariates (climate and landcover) to the extend around KC
-    (*not yet*)
+-   Crop both covariates (climate and landcover) to the extend around KC ✓
 -   Link both covariates (climate and landcover) to location data (*not
     yet*)
 -   Plot the landcover \_crop (*not yet*)
