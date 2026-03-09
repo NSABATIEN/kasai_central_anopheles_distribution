@@ -45,8 +45,12 @@ drc_shp <-gadm(
   path= "data/downloads"
 )
 
-# Select KC
-
+# Select KC province
+drc_shp_prv <- gadm(
+  country = "COD",
+  level = 1,
+  path = "data/downloads"
+)
 kc<- drc_shp_prv |> 
   filter(
     NAME_1 == "Kasaï-Central"
@@ -64,12 +68,14 @@ plot (landcover_crop)
 
 writeRaster(
   bioclim_crop,
-  "data/clean/bioclim_crop.tif"
+  "data/clean/bioclim_crop.tif",
+  overwrite = TRUE
 )
 
 writeRaster(
   landcover_crop,
-  "data/clean/landcover_crop.tif"
+  "data/clean/landcover_crop.tif",
+  overwrite = TRUE
 )
 
 
@@ -83,3 +89,25 @@ coords <- read_csv("data/clean/kc_households_coords.csv",
                      lat_dd = col_double(),
                      long_dd = col_double()
                    )) 
+# do PCA to reduce the dimensions of these
+pca_bioclim <- bioclim_crop %>%
+  terra::extract(
+    select(coords, long_dd, lat_dd),
+    ID = FALSE
+  ) %>%
+  prcomp(center = TRUE,
+         scale = TRUE)
+summary(pca_bioclim)
+
+# keep the Bioclimatic variables explaining 95% of the variance
+sry <- summary(pca_bioclim)
+n_pcs_keep <- min(which(sry$importance["Cumulative Proportion", ] > 0.9))
+
+# make rasters of those variables explaining 95% of the variance
+pcs_bioclim <- predict(bioclim_crop, pca_bioclim)
+pcs_bioclim_keep <- pcs_bioclim[[seq_len(n_pcs_keep)]]
+names(pcs_bioclim_keep) <- paste0("bioclim_", tolower(names(pcs_bioclim_keep)))
+plot(pcs_bioclim_keep)
+## BIO1: Annual Mean Temperature, BIO2: Mean Diurnal Range (Mean of monthly (max temp - min temp)), BIO3: Isothermality (BIO2/BIO7) (×100) and BIO4: Temperature Seasonality (standard deviation ×100) were the only variable explaining 95% of the variance
+
+# Now let do the same for landcover
