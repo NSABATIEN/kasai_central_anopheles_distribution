@@ -23,9 +23,9 @@ This roadmap outlines the key steps to be completed for Objective 1, which focus
     -   Landcover layers downloaded in geodata package using
         global\_landcover function ✓
 -   Crop both covariates (climate and landcover) to the extend around KC ✓
--   Link both covariates (climate and landcover) to location data (*not
-    yet*)
--   Plot the landcover \_crop (*not yet*)
+-   Link both covariates (climate and landcover) to location data ✓
+-   Plot the landcover \_crop ✓
+-   Prepare the covariates for the whole contry (*this need to be done tomorrow*)
 
 ## **Step 4 : Fit the model**
 
