@@ -6,3 +6,10 @@ data/
 *.csv
 *.xls
 *.xlsx
+/output
+kc_plots_files
+*.tif
+*.DS_Store
+*.pdf
+*.ppt
+*.pptx
