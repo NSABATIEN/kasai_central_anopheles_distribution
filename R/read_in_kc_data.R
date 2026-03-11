@@ -47,6 +47,8 @@ files <- list.files(
 
 latest_file <- files[which.max(file.info(files)$mtime)]
 
+#print(latest_file)
+
 # need to understand the concept of index (vic)
 # Note: files[which.max(file.info(files)$size)] #(this line of code is not concern my own code but I keep it as an example to help the understanding of indexing + `file.info about the`size, mtime, ctime, atime)
 # files[which.max(file.info(files)$size)]  # select the largest file
@@ -277,10 +279,10 @@ theme_minimal()
 
 missing_data + location + plot_layout(ncol = 1)
 
-kc_df |>
-  filter(lat_dd > 0)
-
-points_sf |>
-  filter(outside_kc) |>
-  st_drop_geometry() |>
-  View()
+# kc_df |>
+#   filter(lat_dd > 0)
+# 
+# points_sf |>
+#   filter(outside_kc) |>
+#   st_drop_geometry() |>
+#   View()
