@@ -20,7 +20,8 @@ library(lubridate)
 ## Make a path for David's computer
 ## dhd_data_path <- "~/pCloud Drive/R/data/va/vic/kc/raw"
 
-vic_data_path <- "V:/1. Vic's PhD Journey 2025/1. Vic's PhD Journey 2025/LSTM PhD work project/1.kc_entomo_database"
+
+vic_data_path <- "V:/1. PhD_Journey 2025_2026/PhD_Workspace/Thesis_Databases/kc_entomo_database"
 
 # Make a path for Vic's computer
 # get_data_folder_path <- function(user = c("dhd", "vic", "ger", "nick")) {
@@ -141,7 +142,8 @@ p_zone_month <-kc_mosq |>
   facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
   labs(title = "kc_data by health zone and collection_month",
        x = "n_anopheles_collected", y = "health_zone") +
-  theme()
+  theme()+
+  theme(axis.text.y = element_text(size = 4))
 plot(p_zone_month)
 
 
