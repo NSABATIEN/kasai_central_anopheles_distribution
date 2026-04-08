@@ -63,7 +63,7 @@ kc_ext <- ext(kc)
 bioclim_crop <- crop(drc_bioclim, kc_ext)
 landcover_crop <- crop(global_landcover, kc_ext)
 
-# plot
+plot (bioclim_crop)
 plot (landcover_crop)
 
 writeRaster(
@@ -130,7 +130,7 @@ emplogit_fraction <- function(fraction, trials = 1e4) {
 }
 landcover_crop_sub_emplogit <- emplogit_fraction(landcover_crop_sub)
 
-8 <- landcover_crop_sub_emplogit %>%
+pca_landcover <- landcover_crop_sub_emplogit %>%
   terra::extract(
     select(coords, long_dd, lat_dd),
     ID = FALSE

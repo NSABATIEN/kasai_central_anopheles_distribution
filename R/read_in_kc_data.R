@@ -104,20 +104,68 @@ kc_mosq_clean <- kc_mosq |>
   group_by(village,house_number) |> 
   summarise(total_count = sum(n_anopheles_collected),.groups = "drop") 
 
-p_month <- kc_mosq |>
-  ggplot(aes(x = collection_month, y = n_anopheles_collected)) +
-  geom_boxplot()  +
-  labs(title = "Mosquito count per collection month in Kasaï-Central",
-    x = "collection_month", y = "n_anopheles_collected") +
-  theme()
-plot(p_month)
+## Create relabelled variable ploting the month collection
+kc_mosq_plot <- kc_mosq |>
+  mutate(
+    collection_month_label = case_when(
+      collection_month == "month_1"  ~ "Apr 2025",
+      collection_month == "month_2"  ~ "May 2025",
+      collection_month == "month_3"  ~ "Jun 2025",
+      collection_month == "month_4"  ~ "Jul 2025",
+      collection_month == "month_5"  ~ "Aug 2025",
+      collection_month == "month_6"  ~ "Sep 2025",
+      collection_month == "month_7"  ~ "Oct 2025",
+      collection_month == "month_8"  ~ "Nov 2025",
+      collection_month == "month_9"  ~ "Dec 2025",
+      collection_month == "month_10" ~ "Jan 2026",
+      collection_month == "month_11" ~ "Feb 2026",
+    ),
+    collection_month_label = factor(
+      collection_month_label,
+      levels = c(
+        "Apr 2025", "May 2025", "Jun 2025", "Jul 2025",
+        "Aug 2025", "Sep 2025", "Oct 2025", "Nov 2025",
+        "Dec 2025", "Jan 2026", "Feb 2026"
+      )
+    )
+  )
+# Check what I get now
+kc_mosq_plot |>
+  count(collection_month, collection_month_label)
 
+# Plot mosquito counts by collection month
+# p_month <- kc_mosq_plot |>
+#   ggplot(aes(x = collection_month_label, y = n_anopheles_collected)) +
+#   geom_boxplot()  +
+#   labs(title = "Mosquito count per collection month in Kasaï-Central",
+#     x = "Collection_month", y = "Number of Anopheles collected") +
+#   theme()
+# plot(p_month)
+p_month <- kc_mosq_plot |>
+  ggplot(aes(x = collection_month_label, y = n_anopheles_collected)) +
+  geom_boxplot() +
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    shape = 18,
+    size = 3
+  ) +
+  labs(
+    title = "Monthly distribution of Anopheles abundance per household in Kasaï-Central",
+    x = "Collection month",
+    y = "Number of Anopheles collected per household"
+  ) +
+  scale_y_continuous(breaks = seq(0, 60, by = 10)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plot(p_month)
 ## Monthly evolution of mosquito count
 
-p_month <- kc_mosq |>
-  group_by(collection_month) |>
+p_month <- kc_mosq_plot |>
+  group_by(collection_month_label) |>
   summarise(total_count = sum(n_anopheles_collected, na.rm = TRUE), .groups = "drop") |>
-  ggplot(aes(x = collection_month, y = total_count, group = 1)) +
+  ggplot(aes(x = collection_month_label, y = total_count, group = 1)) +
   geom_line() +
   geom_point() +
   scale_y_continuous(
@@ -125,9 +173,9 @@ p_month <- kc_mosq |>
     limits = c(0, 1200)
   ) +
   labs(
-    title = "Total mosquito count per collection month in Kasaï-Central",
+    title = "Monthly total Anopheles collections in Kasaï-Central",
     x = "collection_month",
-    y = "Total n_anopheles_collected"
+    y = "Total number of Anopheles collected"
   ) +
   theme()
 
@@ -136,36 +184,64 @@ p_month
 
 ## Plot per zone per month
 
-p_zone_month <-kc_mosq |>
+p_zone_month <-kc_mosq_plot |>
   ggplot(aes(y = health_zone, x = n_anopheles_collected)) +
   geom_boxplot() +
-  facet_wrap(~ collection_month, ncol = 2, scales = "free_y") +
+  facet_wrap(~ collection_month_label, ncol = 5, scales = "free_y") +
   labs(title = "kc_data by health zone and collection_month",
        x = "n_anopheles_collected", y = "health_zone") +
-  theme()+
-  theme(axis.text.y = element_text(size = 4))
+  theme(axis.text.y = element_text(size = 6))
 plot(p_zone_month)
 
 
 # Species visualization 
+kc_species_plot <- kc_species |>
+  mutate(
+    collection_month_label = case_when(
+      collection_month == "month_1"  ~ "Apr 2025",
+      collection_month == "month_2"  ~ "May 2025",
+      collection_month == "month_3"  ~ "Jun 2025",
+      collection_month == "month_4"  ~ "Jul 2025",
+      collection_month == "month_5"  ~ "Aug 2025",
+      collection_month == "month_6"  ~ "Sep 2025",
+      collection_month == "month_7"  ~ "Oct 2025",
+      collection_month == "month_8"  ~ "Nov 2025",
+      collection_month == "month_9"  ~ "Dec 2025",
+      collection_month == "month_10" ~ "Jan 2026",
+      collection_month == "month_11" ~ "Feb 2026",
+    ),
+    collection_month_label = factor(
+      collection_month_label,
+      levels = c(
+        "Apr 2025", "May 2025", "Jun 2025", "Jul 2025",
+        "Aug 2025", "Sep 2025", "Oct 2025", "Nov 2025",
+        "Dec 2025", "Jan 2026", "Feb 2026"
+      )
+    )
+  )
 
 kc_species <- read_excel(latest_file, sheet = "species") |>
   clean_names()
 
-kc_taxon_summary <- kc_species |>
+kc_taxon_summary <- kc_species_plot |>
   filter(!is.na(identification_taxon)) |>
-  group_by(collection_month, health_zone, identification_taxon) |>
+  group_by(collection_month_label, health_zone, identification_taxon) |>
   summarise(n = n(), .groups = "drop")
 
 p_taxon <- ggplot(kc_taxon_summary,
                   aes(x = health_zone, y = n, fill = identification_taxon)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~ collection_month, ncol = 3, scales = "free_x") +
+  facet_wrap(~ collection_month_label, ncol = 5) +
+  scale_y_continuous(
+    limits = c(0, 200),
+    breaks = seq(0, 200, by = 50)
+  ) +
+  theme_bw() +
   theme(
-    axis.text.y = element_text(size = 5)  
+    axis.text.y = element_text(size = 7),
+    strip.text = element_text(size = 11)
   )
-
 p_taxon
 
 ## Join location information
@@ -288,3 +364,4 @@ missing_data + location + plot_layout(ncol = 1)
 #   filter(outside_kc) |>
 #   st_drop_geometry() |>
 #   View()
+
