@@ -15,7 +15,7 @@ This roadmap outlines the key steps to be completed for Objective 1, which focus
 -   Join collection data and location data (*done*)
 -   Preliminary Spatial visualization and quality check (*done*)
 
-## **Step 3 : Prepare environmental covariates (*in progress*)**
+## **Step 3 : Prepare environmental covariates (*done*)**
 
 -   Download environmental covariates (*done*) :
     -   Bioclimatic variables downloaded in geodata package using
@@ -25,13 +25,15 @@ This roadmap outlines the key steps to be completed for Objective 1, which focus
 -   Crop both covariates (climate and landcover) to the extend around KC ✓
 -   Link both covariates (climate and landcover) to location data ✓
 -   Plot the landcover \_crop ✓
--   Prepare the covariates for the whole contry (*this need to be done tomorrow*)
+-   Prepare the covariates for the whole contry ✓
 
-## **Step 4 : Fit the model**
+## **Step 4 : Loading model and conducting env\_ (MESS) (*done*)**
+
+## **Step 5 : Fit the model (*in progress*)**
 
 Binomial model for presence/absence data, or poisson model for count
-data will be using (*not yet*)
+data will be using (*in progress*)
 
-## **Step 5 : Model Diagnostics Using DHARMa (*not yet*)**
+## **Step 6 : Model Diagnostics Using DHARMa (*not yet*)**
 
-## **Step 6 : Loading model and conducting env\_ (MESS) (*not yet*)**
+
