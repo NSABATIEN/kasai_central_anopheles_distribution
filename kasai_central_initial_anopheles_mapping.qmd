@@ -1,0 +1,18 @@
+---
+title: "Environmental covariates, PCA and MESS analysis prior *Anopheles* distribution mapping in Kasaï-Central"
+format: pdf
+editor: visual
+author: "Victoire Nsabatien & all supervisors"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+# Introduction
+
+This document presents the environmental covariates, principal component analysis (PCA), and multivariate environmental similarity surface (MESS) conducted prior to the preliminary mapping of *Anopheles* distribution in Kasaï-Central.
