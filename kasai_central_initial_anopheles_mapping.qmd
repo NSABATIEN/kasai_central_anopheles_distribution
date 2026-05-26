@@ -16,3 +16,100 @@ knitr::opts_chunk$set(
 # Introduction
 
 This document presents the environmental covariates, principal component analysis (PCA), and multivariate environmental similarity surface (MESS) conducted prior to the preliminary mapping of *Anopheles* distribution in Kasaï-Central.
+
+# Surveyed households
+
+Surveys were conducted across Kasaï-Central Province, Democratic Republic of the Congo. The figure shows the location of surveyed households across the province.
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+library(geodata)
+library(readr)
+library(cowplot)
+library(idpalette)
+library(mgcv)
+```
+
+```{r}
+#| fig-cap: "Surveyed household locations in Kasaï-Central shown as pink points."
+
+library(cowplot)
+
+coords <- read_csv("data/clean/kc_household_coords.csv",
+                   col_types = cols(
+                     health_zone = col_character(),
+                     health_area = col_character(),
+                     village = col_character(),
+                     house_number = col_character(),
+                     lat_dd = col_double(),
+                     long_dd = col_double()
+                   ))
+
+drc <- geodata::gadm("COD", level = 0)
+drc_l1 <- geodata::gadm("COD", level = 1)
+drc_l2 <- geodata::gadm("COD", level = 2)
+
+kc <- drc_l1 |>
+  filter(NAME_1 == "Kasaï-Central")
+
+kc_extent <- ext(kc)
+
+p1 <- ggplot() +
+  geom_spatvector(
+    data = crop(drc_l2, kc_extent),
+    fill = "grey98",
+    col = "grey30",
+    alpha = 0.9
+  ) +
+  geom_spatvector(
+    data = kc,
+    fill = "transparent",
+    col = "grey5",
+    linewidth = 0.75
+  ) +
+  geom_point(
+    data = coords,
+    aes(x = long_dd, y = lat_dd),
+    col = "hotpink",
+    size = 0.6
+  ) +
+  theme_void()
+
+p2 <- ggplot() +
+  geom_spatvector(
+    data = drc_l1,
+    fill = "grey98",
+    col = "grey30"
+  ) +
+  geom_spatvector(
+    data = drc,
+    fill = "transparent",
+    col = "grey5",
+    linewidth = 0.75
+  ) +
+  geom_spatvector(
+    data = kc,
+    fill = "grey98",
+    col = "grey5",
+    alpha = 0.9
+  ) +
+  geom_point(
+    data = coords,
+    aes(x = long_dd, y = lat_dd),
+    col = "hotpink",
+    size = 0.6
+  ) +
+  theme_void()
+
+ggdraw(p2) +
+  draw_plot(
+    p1,
+    x = 0.38,
+    y = 0,
+    width = 0.62,
+    height = 0.62
+  )
+```
