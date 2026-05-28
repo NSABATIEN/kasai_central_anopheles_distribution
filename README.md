@@ -4,16 +4,16 @@ This roadmap outlines the key steps for Objective 1, which focuses on developing
 
 ## **Step 1 : Load packages (*done*)**
 
-- Load all packages required
+- Load all packages required ✓
 
 ## **Step 2 : Read in KC data (*done*)**
 
-- Define a path and find the latest Excel file (*done*)
-- Read in Excel sheets and clean the data (*done*)
-- Clean and summarize collection data (*done*)
-- Clean and summarize location data (*done*)
-- Join collection data and location data (*done*)
-- Preliminary Spatial visualization and quality check (*done*)
+- Define a path and find the latest Excel file ✓
+- Read in Excel sheets and clean the data ✓
+- Clean and summarize collection data ✓
+- Clean and summarize location data ✓
+- Join collection data and location data ✓
+- Preliminary Spatial visualization and quality check ✓
 
 ## **Step 3 : Prepare environmental covariates (*done*)**
 
@@ -25,18 +25,6 @@ This roadmap outlines the key steps for Objective 1, which focuses on developing
   - Visualise raw bioclimatic and landcover variables ✓
 - Link both covariates (climate and landcover) to location data :
   - Plot the climate and landcover ✓
-
-## **Step 3 : Prepare environmental covariates (*done*)**
-
-- Download environmental covariates (*done*) :
-  - WorldClim bioclimatic variables downloaded using the geodata package ✓\
-  - Landcover variables downloaded in geodata package using global_landcover function ✓
-- Prepare environmental rasters (*done*):
-  - Crop climate and landcover rasters to the Kasaï-Central extent ✓
-  - Visualise raw bioclimatic and landcover variables
-- Link both covariates (climate and landcover) to location data ✓
-  - Plot the landcover \_crop ✓ \>\>\>\>\>\>\> 5be829ec488ecc95d391dcf29afa086843fae442
-  - Prepare covariates for the whole country ✓
 
 ## **Step 4 : Conduct PCA of environmental covariates (*done*)**
 
