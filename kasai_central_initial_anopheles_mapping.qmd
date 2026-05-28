@@ -13,15 +13,11 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Introduction
+# 1. Introduction
 
 This document presents the environmental covariates, principal component analysis (PCA), and multivariate environmental similarity surface (MESS) conducted prior to the preliminary mapping of *Anopheles* distribution in Kasaï-Central.
 
-# Surveyed households
-
-Surveys were conducted across Kasaï-Central Province, Democratic Republic of the Congo. The figure shows the location of surveyed households across the province.
-
-```{r setup, include=FALSE}
+```{r load-packages, include=FALSE,message=FALSE, warning=FALSE}
 library(dplyr)
 library(terra)
 library(ggplot2)
@@ -31,50 +27,72 @@ library(readr)
 library(cowplot)
 library(idpalette)
 library(mgcv)
+library(sf)
+library(janitor)
 ```
 
-```{r}
-#| fig-cap: "Surveyed household locations in Kasaï-Central shown as pink points."
+```{r load-household-coordinates,include=FALSE}
+coords <- read_csv(
+  "data/clean/kc_household_coords.csv",
+  col_types = cols(
+    health_zone = col_character(),
+    health_area = col_character(),
+    village = col_character(),
+    house_number = col_character(),
+    lat_dd = col_double(),
+    long_dd = col_double()
+  )
+)
 
-library(cowplot)
+```
 
-coords <- read_csv("data/clean/kc_household_coords.csv",
-                   col_types = cols(
-                     health_zone = col_character(),
-                     health_area = col_character(),
-                     village = col_character(),
-                     house_number = col_character(),
-                     lat_dd = col_double(),
-                     long_dd = col_double()
-                   ))
-
+```{r load-drc-boundaries,include=FALSE}
 drc <- geodata::gadm("COD", level = 0)
 drc_l1 <- geodata::gadm("COD", level = 1)
 drc_l2 <- geodata::gadm("COD", level = 2)
+```
 
+```{r select-kasai-central,include=FALSE, message=FALSE, warning=FALSE}
 kc <- drc_l1 |>
   filter(NAME_1 == "Kasaï-Central")
 
-kc_extent <- ext(kc)
+health_zones <- sf::st_read(
+  "data/downloads/grid3/grid3_cod_health_zones_v8_0.gpkg"
+) |>
+  janitor::clean_names()
+
+kc_hz <- health_zones |>
+  filter(province == "Kasaï-Central")
+```
+
+## 2. Surveyed household locations
+
+Entomological surveys were conducted in Kasaï-Central Province, located in the south-central of DRC, which shares a partial border with Angola.
+
+The figure shows the geographic distribution of surveyed households within Kasaï-Central. The national map situates the province within the DRC, while the inset map provides a closer view of the surveyed households, the Kasaï-Central provincial boundary, and health-zone boundaries across the province.
+
+```{r surveyed-household-locations}
+#| fig-cap: "Surveyed household locations in Kasaï-Central are shown as pink points. In the national map, the thick black line represents the national border, and Kasaï-Central is highlighted within the DRC. In the inset map, thick black lines represent the Kasaï-Central provincial boundary, while lighter grey lines represent health-zone boundaries across the province."
 
 p1 <- ggplot() +
   geom_spatvector(
-    data = crop(drc_l2, kc_extent),
+    data = kc_hz,
     fill = "grey98",
-    col = "grey30",
-    alpha = 0.9
+    col = "grey85",
+    linewidth = 0.15
   ) +
   geom_spatvector(
-    data = kc,
-    fill = "transparent",
-    col = "grey5",
-    linewidth = 0.75
+    data = sf::st_union(kc_hz),
+    fill = NA,
+    col = "black",
+    linewidth = 0.9
   ) +
   geom_point(
     data = coords,
     aes(x = long_dd, y = lat_dd),
     col = "hotpink",
-    size = 0.6
+    size = 0.7,
+    alpha = 0.85
   ) +
   theme_void()
 
@@ -82,19 +100,20 @@ p2 <- ggplot() +
   geom_spatvector(
     data = drc_l1,
     fill = "grey98",
-    col = "grey30"
+    col = "grey30",
+    linewidth = 0.25
   ) +
   geom_spatvector(
     data = drc,
     fill = "transparent",
-    col = "grey5",
-    linewidth = 0.75
+    col = "grey10",
+    linewidth = 0.8
   ) +
   geom_spatvector(
     data = kc,
     fill = "grey98",
-    col = "grey5",
-    alpha = 0.9
+    col = "grey10",
+    linewidth = 0.7
   ) +
   geom_point(
     data = coords,
@@ -104,8 +123,8 @@ p2 <- ggplot() +
   ) +
   theme_void()
 
-ggdraw(p2) +
-  draw_plot(
+cowplot::ggdraw(p2) +
+  cowplot::draw_plot(
     p1,
     x = 0.38,
     y = 0,
@@ -113,3 +132,726 @@ ggdraw(p2) +
     height = 0.62
   )
 ```
+
+# 3. Covariate data
+
+Environmental covariates were drawn from `geodata` using the WorldClim bioclimatic and global landcover datasets. These include 19 bioclimatic variables and 11 landcover variables describing climatic and landscape conditions across Kasaï-Central.
+
+Because many of these variables are highly correlated, principal component analysis (PCA) was used to reduce dimensionality and summarise the environmental variation into a smaller number of uncorrelated variables explaining 90% of the variance.
+
+## 3.1.  Bioclimatic variables
+
+These are:
+
+- BIO1: Annual Mean Temperature
+- BIO2: Mean Diurnal Range (Mean of monthly (max temp - min temp))
+- BIO3: Isothermality (BIO2/BIO7) (×100)
+- BIO4: Temperature Seasonality (standard deviation ×100)
+- BIO5: Max Temperature of Warmest Month
+- BIO6: Min Temperature of Coldest Month
+- BIO7: Temperature Annual Range (BIO5-BIO6)
+- BIO8: Mean Temperature of Wettest Quarter
+- BIO9: Mean Temperature of Driest Quarter
+- BIO10: Mean Temperature of Warmest Quarter
+- BIO11: Mean Temperature of Coldest Quarter
+- BIO12: Annual Precipitation
+- BIO13: Precipitation of Wettest Month
+- BIO14: Precipitation of Driest Month
+- BIO15: Precipitation Seasonality (Coefficient of Variation)
+- BIO16: Precipitation of Wettest Quarter
+- BIO17: Precipitation of Driest Quarter
+- BIO18: Precipitation of Warmest Quarter
+- BIO19: Precipitation of Coldest Quarter
+
+```{r load-cropped-covariates}
+bioclim_crop <- terra::rast("data/clean/bioclim_crop.tif")
+landcover_crop <- terra::rast("data/clean/landcover_crop.tif")
+covs <- terra::rast("data/clean/covariates.tif")
+```
+
+### 3.1.1 Raw bioclimatic variables
+
+```{r plot-raw-bioclim-1-10}
+#| fig-cap: "Raw bioclimatic variables 1–10 for Kasaï-Central."
+
+plot(
+  bioclim_crop[[1:10]],
+  axes = FALSE,
+  col = idpalette::idem(50, rev = TRUE)
+)
+```
+
+```{r}
+#| fig-cap: "Raw bioclimatic variables 11–19 for Kasaï-Central."
+
+plot(
+  x = bioclim_crop[[11:19]],
+  axes = FALSE,
+  col = idpalette::idem(50, rev = TRUE)
+)
+```
+
+## 3.1.2 PCA of bioclimatic variables
+
+### Why PCA matters
+
+Many bioclimatic variables extracted across Kasaï-Central contain contain similar environmental information. PCA was used to simplify the 19 bioclimatic variables into a few new variables create that summarise most of the climate information across the province.
+
+The first four principal components were retained because they captured more than 90% of the climatic variation across the province.
+
+```{r run-bioclim-pca}
+# Extract bioclimatic values at surveyed household locations
+bioclim_values <- bioclim_crop |>
+  terra::extract(
+    dplyr::select(coords, long_dd, lat_dd),
+    ID = FALSE
+  )
+
+# Run PCA on bioclimatic variables
+pca_bioclim <- bioclim_values |>
+  stats::prcomp(
+    center = TRUE,
+    scale. = TRUE
+  )
+```
+
+```{r show-bioclim-pca-results}
+
+# PCA table with percentages
+pca_summary <- summary(pca_bioclim)
+
+pca_table <- data.frame(
+  PC = colnames(pca_summary$importance),
+  Standard_deviation = round(
+    pca_summary$importance["Standard deviation", ],
+    3
+  ),
+  Individual_variation_percent = round(
+    pca_summary$importance["Proportion of Variance", ] * 100,
+    1
+  ),
+  Cumulative_variation_percent = round(
+    pca_summary$importance["Cumulative Proportion", ] * 100,
+    1
+  )
+)
+
+knitr::kable(
+  pca_table,
+  caption = "Summary of bioclimatic PCA results."
+)
+```
+
+
+```{r plot-bioclim-pca}
+#| fig-cap: "PCA of bioclimatic variables for Kasaï-Central."
+
+plot(
+  covs[[grep("bioclim", names(covs))]],
+  axes = FALSE,
+  col = idpalette::idem(50, rev = TRUE)
+)
+```
+
+## 3.1.3 Contribution of bioclimatic variables to PCA
+
+Each PCA component is created from a combination of the original bioclimatic variables across the province. The table below shows the contribution values of each bioclimatic variable to the first four retained PCA components.
+
+```{r bioclim-pca-loadings-learning}
+pca_loadings <- pca_bioclim$rotation[, 1:4] |>
+  round(2) |>
+  as.data.frame()
+
+pca_loadings$BIO_variable <- rownames(pca_loadings)
+
+pca_loadings <- pca_loadings |>
+  dplyr::select(BIO_variable, PC1, PC2, PC3, PC4)
+
+knitr::kable(
+  pca_loadings,
+  caption = "Contribution values of bioclimatic variables to the first four retained PCA components."
+)
+```
+
+## 3.1.4 Strongest bioclimatic contribution values
+
+The table below shows the strongest bioclimatic contribution values for each retained PCA component. Variables with larger absolute contribution values contributed most strongly to the environmental gradient represented by each principal component.
+
+```{r strongest-bioclim-loadings}
+pca_loadings_long <- pca_loadings |>
+  tidyr::pivot_longer(
+    cols = PC1:PC4,
+    names_to = "PC",
+    values_to = "loading"
+  ) |>
+  dplyr::mutate(
+    absolute_loading = abs(loading)
+  )
+
+strongest_bioclim_loadings <- pca_loadings_long |>
+  dplyr::group_by(PC) |>
+  dplyr::slice_max(
+    order_by = absolute_loading,
+    n = 4
+  ) |>
+  dplyr::arrange(PC, dplyr::desc(absolute_loading))
+
+knitr::kable(
+  strongest_bioclim_loadings,
+  caption = "Four strongest bioclimatic contribution values for each retained PCA component."
+)
+```
+
+Based on the strongest contribution values, the retained bioclimatic components can be interpreted as follows:
+
+**bioclim_pc1 – Temperature gradient (64.4%)**
+
+Temperature-related variables contributed most strongly to `bioclim_pc1`, particularly minimum temperature of the coldest month (`bio_6`), annual mean temperature (`bio_1`), mean temperature of the wettest quarter (`bio_8`), mean temperature of the driest quarter (`bio_9`), mean temperature of the warmest quarter (`bio_10`), and mean temperature of the coldest quarter (`bio_11`).
+
+**bioclim_pc2 – Rainfall seasonality and warm-temperature gradient (12.3%)**
+
+Precipitation of the wettest month (`bio_13`), annual precipitation (`bio_12`), and precipitation of the driest month (`bio_14`) contributed strongly to `bioclim_pc2`. Maximum temperature of the warmest month (`bio_5`) also contributed strongly. This component therefore represents variation in seasonal rainfall patterns combined with warm-temperature conditions.
+
+**bioclim_pc3 – Precipitation pattern gradient (8.3%)**
+
+Annual precipitation (`bio_12`), precipitation of the coldest quarter (`bio_19`), precipitation of the wettest month (`bio_13`), and precipitation of the wettest quarter (`bio_16`) contributed most strongly to `bioclim_pc3`. This component mainly represents variation in annual and seasonal precipitation patterns.
+
+**bioclim_pc4 – Warm-season precipitation and temperature seasonality gradient (5.3%)**
+
+Precipitation of the warmest quarter (`bio_18`) and temperature seasonality (`bio_4`) contributed most strongly to `bioclim_pc4`. Isothermality (`bio_3`), temperature annual range (`bio_7`), and precipitation of the coldest quarter (`bio_19`) also contributed, but more weakly.
+
+# 3.2 Landscape variables
+
+Landscape variables describe the proportion of different landcover types across Kasaï-Central.
+
+## 3.2.1 Raw landcover variables
+
+The raw landscape variables included:
+
+- trees
+- grassland
+- shrubs
+- cropland
+- built structures
+- bare ground
+- snow
+- water
+- wetlands
+- mangroves
+- moss
+
+Across Kasaï-Central, snow, mangroves, and moss showed no variation and were therefore excluded from further analysis.
+
+```{r plot-raw-landcover}
+#| fig-cap: "Raw landcover variables for Kasaï-Central."
+
+plot(
+  landcover_crop[[c(1:6, 8:9)]],
+  axes = FALSE,
+  col = idpalette::idem(50, rev = TRUE)
+)
+```
+
+The raw landcover variables showed distinct landscape patterns across Kasaï-Central. Tree cover was generally higher in northern parts of the province, while grassland and shrub cover were more common across central and southern areas.
+
+Water coverage mainly followed major river networks across the province. In contrast, cropland, built areas, bare ground, and wetlands were more localised and covered relatively smaller proportions of the landscape.
+
+## 3.2.2 PCA of landcover variables
+
+Many landcover variables extracted across Kasaï-Central described related landscape patterns across the province. PCA was used to combine these variables into a smaller number of new environmental components that summarise the dominant landscape variation across Kasaï-Central.
+
+```{r prepare-landcover-data-and-run-pca}
+# Extract landcover values at sampled household locations
+landcover_values <- landcover_crop |>
+  terra::extract(
+    dplyr::select(coords, long_dd, lat_dd),
+    ID = FALSE
+  )
+
+# Keep only landcover layers that vary across sampled locations
+landcover_layers_varying <- which(
+  apply(landcover_values, 2, var, na.rm = TRUE) != 0
+)
+
+landcover_crop_sub <- landcover_crop[[landcover_layers_varying]]
+
+# Transform proportional landcover values before PCA
+emplogit_fraction <- function(fraction, trials = 1e4) {
+  successes <- trials * fraction
+  failures <- trials - successes
+  log((successes + 0.5) / (failures + 0.5))
+}
+
+landcover_crop_sub_emplogit <- emplogit_fraction(landcover_crop_sub)
+
+# Run PCA on transformed landcover values at household locations
+pca_landcover <- landcover_crop_sub_emplogit |>
+  terra::extract(
+    dplyr::select(coords, long_dd, lat_dd),
+    ID = FALSE
+  ) |>
+  prcomp(
+    center = TRUE,
+    scale = TRUE
+  )
+```
+
+## 3.2.3 Landcover PCA summary
+
+```{r show-landcover-pca-results}
+landcover_pca_summary <- summary(pca_landcover)
+
+landcover_pca_table <- data.frame(
+  PC = colnames(landcover_pca_summary$importance),
+  Standard_deviation = round(
+    landcover_pca_summary$importance["Standard deviation", ],
+    3
+  ),
+  Individual_variation_percent = round(
+    landcover_pca_summary$importance["Proportion of Variance", ] * 100,
+    1
+  ),
+  Cumulative_variation_percent = round(
+    landcover_pca_summary$importance["Cumulative Proportion", ] * 100,
+    1
+  )
+)
+knitr::kable(
+  landcover_pca_table,
+  caption = "Summary of landcover PCA results."
+)
+```
+
+```{r plot-landcover-pca}
+#| fig-cap: "PCA of landcover variables for Kasaï-Central."
+
+plot(
+  covs[[grep("landcover", names(covs))]],
+  axes = FALSE,
+  col = idpalette::idem(50, rev = TRUE)
+)
+```
+
+## 3.2.4 Contribution of landcover variables to PCA
+
+Each retained landcover PCA component was derived from a combination of the original landcover variables extracted across Kasaï-Central. The table below shows the contribution values of each landcover variable to the retained PCA components.
+
+```{r landcover-pca-loadings}
+landcover_loadings <- pca_landcover$rotation[, 1:5] |>
+  round(2) |>
+  as.data.frame()
+
+landcover_loadings$landcover_variable <- rownames(landcover_loadings)
+
+landcover_loadings <- landcover_loadings |>
+  dplyr::select(
+    landcover_variable,
+    PC1,
+    PC2,
+    PC3,
+    PC4,
+    PC5
+  )
+knitr::kable(
+  landcover_loadings,
+  caption = "Contribution values of landcover variables to the first five retained PCA components."
+)
+```
+
+For each retained PCA component, the table below shows the five landcover variables with the strongest contributions.
+
+```{r strongest-landcover-loadings}
+landcover_loadings_long <- landcover_loadings |>
+  tidyr::pivot_longer(
+    cols = PC1:PC5,
+    names_to = "PC",
+    values_to = "loading"
+  ) |>
+  dplyr::mutate(
+    absolute_loading = abs(loading)
+  )
+
+strongest_landcover_loadings <- landcover_loadings_long |>
+  dplyr::group_by(PC) |>
+  dplyr::slice_max(
+    order_by = absolute_loading,
+    n = 5
+  ) |>
+  dplyr::arrange(PC, dplyr::desc(absolute_loading))
+
+knitr::kable(
+  strongest_landcover_loadings,
+  caption = "Five strongest landcover contribution values for each retained PCA component."
+)
+```
+
+Based on the strongest contribution values, the retained landcover components can be interpreted as follows:
+
+**landcover_pc1 – Vegetation cover gradient (33.3%)**
+
+Tree cover contributed positively to `landcover_pc1`, while grassland and cropland contributed negatively. This component mainly represents the difference between more forested areas and more open grassland or cropland areas across Kasaï-Central.
+
+**landcover_pc2 – Shrub, built environment, and wetland gradient (27.8%)**
+
+Shrub cover contributed negatively to `landcover_pc2`, while built structures and wetlands contributed positively. This component mainly represents differences between shrub-dominated landscapes and areas influenced by built structures and wetter environments.
+
+**landcover_pc3 – Bare ground and wetland gradient (14.2%)**
+
+Bare ground contributed positively to `landcover_pc3`, while wetlands contributed negatively. This component mainly represents differences between drier bare landscapes and wetter wetland environments.
+
+**landcover_pc4 – Wetland, shrubland, and bare-ground gradient (9.7%)**
+
+Wetlands, shrubs, and bare ground contributed positively to `landcover_pc4`, while cropland contributed negatively. This component mainly represents differences between wetter natural vegetation or bare-ground areas and cultivated landscapes.
+
+**landcover_pc5 – Built environment gradient (7.2%)**
+
+Built structures contributed most strongly to `landcover_pc5`, with a strong negative contribution value. This component mainly represents variation related to human-built environments across Kasaï-Central.
+
+Together, the first five principal components explained more than 90% of the landscape information contained in the original landcover variables across Kasaï-Central.
+
+# 4. Multivariate Environmental Similarity Surface (MESS)
+
+MESS analysis was used to identify areas with environmental conditions similar to those observed at surveyed household locations across Kasaï-Central.
+
+Areas with positive MESS values represent environments similar to sampled conditions, while negative values indicate environments that are environmentally different from the sampled locations. Strongly negative values indicate areas where model predictions may be less reliable because environmental conditions were not well represented in the survey data.
+
+```{r extract-household-covariates-for-mess,include=FALSE}
+coord_covs <- covs |>
+  terra::extract(
+    dplyr::select(coords, long_dd, lat_dd),
+    ID = FALSE
+  )
+```
+
+```{r prepare-mess-covariates,include=FALSE}
+coord_covs_clean <- coord_covs |>
+  dplyr::select(
+    bioclim_pc1:landcover_pc5
+  )
+```
+
+```{r run-mess-analysis,include=FALSE, warning=FALSE, message=FALSE}
+covraster <- raster::brick("data/clean/covariates.tif")
+
+mess_drc <- dismo::mess(
+  x = covraster,
+  v = coord_covs_clean
+) |>
+  terra::rast()
+```
+
+```{r clean-mess-values,include=FALSE}
+mess_drc_plot <- mess_drc
+
+mess_drc_plot[
+  is.infinite(values(mess_drc_plot))
+] <- NA
+```
+
+# Plot MESS map
+
+```{r plot-mess-map}
+#| fig-cap: "Multivariate Environmental Similarity Surface (MESS) across Kasaï-Central."
+
+mess_limit <- max(
+  abs(values(mess_drc_plot)),
+  na.rm = TRUE
+)
+
+plot_mess_local <- ggplot() +
+  tidyterra::geom_spatraster(
+    data = mess_drc_plot
+  ) +
+  scale_fill_distiller(
+    type = "div",
+    palette = "RdBu",
+    direction = 1,
+    limits = c(-mess_limit, mess_limit),
+    na.value = "grey"
+  ) +
+  theme_void() +
+  labs(
+    fill = "Environmental\nsimilarity"
+  )
+
+plot_mess_local
+```
+
+## 4.2 Create MESS mask
+
+The MESS map shows where environments are similar or different from the surveyed household locations. For later modelling, we can create a mask that keeps only areas with environmental conditions similar to the sampled locations.
+
+In this mask:
+
+- areas with `MESS >= 0` are kept and given a value of `1`;
+- areas with `MESS < 0` are removed and converted to `NA`.
+
+```{r create-mess-mask,include=FALSE}
+mess_mask <- mess_drc
+
+mvals <- values(mess_drc)
+
+mess_mask[which(mvals < 0)] <- NA
+mess_mask[which(mvals >= 0)] <- 1
+```
+
+The mask is restricted to Kasaï-Central province so that only the study area is displayed.
+
+```{r mask-mess-to-kasai-central, include=FALSE}
+mess_mask_kc <- terra::mask(
+  mess_mask,
+  terra::vect(kc_hz)
+)
+```
+
+```{r plot-mess-mask-kasai-central}
+#| fig-cap: "MESS mask showing environmentally similar areas within Kasaï-Central province."
+
+mess_mask_df <- mess_mask_kc |>
+  as.data.frame(xy = TRUE, na.rm = FALSE)
+
+names(mess_mask_df)[3] <- "mess_mask_value"
+
+ggplot() +
+  geom_raster(
+    data = mess_mask_df,
+    aes(
+      x = x,
+      y = y,
+      fill = as.factor(mess_mask_value)
+    )
+  ) +
+  geom_sf(
+    data = kc_hz,
+    fill = NA,
+    col = "grey70",
+    linewidth = 0.15
+  ) +
+  geom_sf(
+    data = sf::st_union(kc_hz),
+    fill = NA,
+    col = "black",
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(
+    values = c("1" = "#FDE725"),
+    na.value = "grey85",
+    name = "MESS mask",
+    labels = c("Environmentally similar")
+  ) +
+  theme_void()
+```
+
+The MESS mask identifies areas where environmental conditions are similar to those observed at the surveyed households. Areas shown as environmentally similar were retained, while areas with negative MESS values were removed.
+
+This mask will be useful in later modelling steps because it can help restrict future prediction maps to areas where environmental conditions are better represented by the survey data.
+
+## 4.3 MESS map with surveyed households
+
+The MESS map compares environmental conditions across Kasaï-Central with the environmental conditions observed at the surveyed households.
+
+```{r plot-mess-local-coords}
+#| fig-cap: "MESS analysis compares environmental conditions across Kasaï-Central with environmental conditions observed at surveyed household locations. Grey dots represent surveyed households. Blue areas indicate environments similar to sampled conditions, while red areas represent environments less similar to sampled conditions "
+
+mess_drc_plot <- mess_drc
+
+mess_drc_plot[
+  is.infinite(values(mess_drc_plot))
+] <- NA
+
+mess_drc_plot <- terra::mask(
+  mess_drc_plot,
+  terra::vect(kc_hz)
+)
+
+mess_limit <- max(
+  abs(values(mess_drc_plot)),
+  na.rm = TRUE
+)
+
+plot_mess_local_coords <- ggplot() +
+  geom_spatraster(
+    data = mess_drc_plot
+  ) +
+  scale_fill_distiller(
+    type = "div",
+    palette = "RdBu",
+    direction = 1,
+    limits = c(-mess_limit, mess_limit),
+    na.value = "grey"
+  ) +
+  geom_sf(
+    data = kc_hz,
+    fill = NA,
+    col = "grey75",
+    linewidth = 0.12
+  ) +
+  geom_sf(
+    data = sf::st_union(kc_hz),
+    fill = NA,
+    col = "black",
+    linewidth = 0.7
+  ) +
+  geom_point(
+    data = coords,
+    aes(x = long_dd, y = lat_dd),
+    col = "grey30",
+    size = 0.8
+  ) +
+  theme_void() +
+  labs(
+    fill = "Multivariate\nEnvironmental\nSimilarity"
+  )
+
+plot_mess_local_coords
+```
+The MESS map shows that most surveyed household locations are located within environmentally similar areas across Kasaï-Central. However, some areas, particularly in northern and eastern parts of the province, showed more negative MESS values, indicating environments that were less represented in the sampled household locations.
+
+Predictions made in these areas during later spatial modelling may therefore be less reliable because they involve greater environmental extrapolation beyond the sampled environmental conditions.
+
+## 4.4 Environmental dissimilarity map
+
+The similarity map indicates how similar environmental conditions across Kasaï-Central are to those observed at the surveyed household locations.
+
+The environmental dissimilarity map was created by reversing the MESS values so that environmentally similar areas have lower values, while environmentally dissimilar areas have higher values. The values were then shifted so the minimum started at zero and log-transformed to improve visual contrast and interpretation.
+
+In this map, values close to `0` represent environments similar to the surveyed household locations, while higher values represent environments increasingly different from the sampled environmental conditions.
+
+```{r create-environmental-dissimilarity-local, include=FALSE}
+
+# Remove infinite values from the MESS raster
+
+mess_drc_clean <- mess_drc
+
+mess_drc_clean[
+  is.infinite(values(mess_drc_clean))
+] <- NA
+
+# Create the mathematical reverse of the MESS raster
+mess_reverse <- -mess_drc_clean
+
+# Shift values so the minimum starts at 0
+dissimilarity_local <- mess_reverse -
+  terra::global(
+    mess_reverse,
+    min,
+    na.rm = TRUE
+  )[1, 1]
+
+# Apply log transformation to improve visual contrast
+dissimilarity_local <- log10(
+  dissimilarity_local + 1
+)
+
+# Compare value ranges across transformation steps
+value_ranges <- data.frame(
+  raster = c(
+    "MESS similarity",
+    "MESS reverse",
+    "Environmental dissimilarity"
+  ),
+  minimum = c(
+    terra::global(
+      mess_drc_clean,
+      "min",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      mess_reverse,
+      "min",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      dissimilarity_local,
+      "min",
+      na.rm = TRUE
+    )[1, 1]
+  ),
+  maximum = c(
+    terra::global(
+      mess_drc_clean,
+      "max",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      mess_reverse,
+      "max",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      dissimilarity_local,
+      "max",
+      na.rm = TRUE
+    )[1, 1]
+  )
+)
+```
+
+## 4.5 Environmental dissimilarity value ranges
+
+The table below summarises the transformation steps used to create the environmental dissimilarity raster from the original MESS similarity raster.
+
+```{r environmental-dissimilarity-values}
+knitr::kable(
+  value_ranges,
+  caption = "Value ranges for the MESS similarity raster, the reversed MESS raster, and the final environmental dissimilarity raster."
+)
+```
+The reversed MESS raster contains the opposite values of the original MESS similarity raster. The final environmental dissimilarity raster starts at `0` because the reversed values were shifted and log-transformed to improve visual interpretation.
+
+In the final dissimilarity raster, values close to `0` represent environments most similar to the surveyed household locations, while higher values represent environments increasingly different from the sampled environmental conditions.
+
+## 4.6 Environmental dissimilarity map across Kasaï-Central
+
+```{r plot-environmental-dissimilarity-local}
+#| fig-cap: "Environmental dissimilarity across Kasaï-Central. Pink dots represent surveyed households. Darker areas indicate environments increasingly different from sampled conditions."
+
+ggplot() +
+  geom_spatraster(
+    data = dissimilarity_local
+  ) +
+  scale_fill_gradient(
+    low = "grey90",
+    high = "grey30",
+    na.value = "white",
+    limits = c(0, 3)
+  ) +
+  theme_void() +
+  geom_point(
+    data = coords,
+    aes(
+      x = long_dd,
+      y = lat_dd
+    ),
+    col = "hotpink"
+  ) +
+  labs(
+    fill = "Multivariate\nEnvironmental\nDissimilarity"
+  )
+```
+
+The environmental dissimilarity map shows that most surveyed household locations are located within areas of relatively low environmental dissimilarity. This suggests that the sampled households capture many of the environmental conditions present across Kasaï-Central.
+
+However, some darker areas, particularly in parts of northern and eastern Kasaï-Central, represent environments increasingly different from the sampled household conditions. These areas may therefore involve greater environmental extrapolation during later spatial modelling. They may also indicate potential gaps in entomological surveillance.
+
+Additional mosquito collections in these areas could help improve environmental representativeness, reduce extrapolation uncertainty, and strengthen future spatial modelling efforts across Kasaï-Central.
+
+# 5. Summary
+
+Environmental covariates included 19 WorldClim bioclimatic variables and 11 global landcover variables extracted across Kasaï-Central. Together, these covariates described broad climatic and landscape variation across the province.
+
+Because many environmental covariates were strongly correlated, PCA was applied separately to the bioclimatic and landcover datasets to reduce dimensionality and summarise the environmental variation into a smaller number of environmental gradients.
+
+The PCA analyses reduced correlated bioclimatic and landcover variables into a smaller number of major environmental components while retaining most of the climatic and landscape variation present across Kasaï-Central.
+
+The MESS similarity and environmental dissimilarity analyses showed that most surveyed household locations captured the dominant environmental conditions across the province. However, some environmentally distinct areas remained less represented by the sampled household locations, particularly in northern and eastern Kasaï-Central.
+
+Together, these analyses provide an important foundation for subsequent spatial modelling by reducing overlap between environmental covariates and identifying areas where environmental extrapolation may occur.
+
+In addition to environmental covariates, vector intervention variables such as ITN coverage, ITN usage, and, where available, the spatial distribution of different ITN types across Kasaï-Central could also be incorporated as additional covariates. These variables may help improve understanding of spatial variation in vector abundance for different malaria vector species across the province.
+
+Future work will explore the main environmental variables associated with hotspots of *Anopheles gambiae* s.l. and *Anopheles funestus* gr across Kasaï-Central. Additional analyses could also investigate the environmental factors associated with spatial patterns of malaria vector species diversity across the province, particularly in Bobozo and Dibaya health zones.
