@@ -1,554 +1,1188 @@
-# checks and analyses
 
-# load in results and data
+# MULTIVARIATE ENVIRONMENTAL SIMILARITY SURFACE ANALYSIS ---------------------
 
-source("R/packages.R")
+# 1. Load packages
 
-covs <- rast("data/clean/covariates.tif")
+# Load the packages required for spatial analysis,
+# environmental similarity assessment,
+# and visualisation.
 
-cod_covs <- rast("data/clean/cod_covariates.tif")
+source(
+  "R/packages.R"
+)
 
-coord_covs <- read_csv(file = "data/clean/coords_covariates.csv") #seems that I don't have it, 
-#so I need to create it 
 
-#need to create coordinate sampling site covariate from covariates.tif + household coordinates
-# coords <- read_csv(
-#   "data/clean/kc_household_coords.csv",
-#   show_col_types = FALSE
-# )
-# 
-# coord_covs <- terra::extract(
-#   covs,
-#   dplyr::select(coords, long_dd, lat_dd),
-#   ID = FALSE
-# )
-# 
-# coord_covs <- bind_cols(coords, coord_covs)
-# 
-# write_csv(
-#   coord_covs,
-#   "data/clean/coords_covariates.csv"
-# )
+# 2. Load Kasaï-Central environmental covariates
 
-prob_household_detection <- rast("output/spatial/prob_household_detection.tif")
+# Load the environmental PCA covariates prepared
+# for Kasaï-Central.
+#
+# These raster layers summarise the main climatic and land-cover
+# gradients across the province and will be used as environmental
+# covariates in the species distribution models.
 
-m <- readRDS(file = "output/model.Rds")
+kc_covariates <- rast(
+  "data/clean/covariates.tif"
+)
 
-coords <- read_csv("data/clean/kc_household_coords.csv",
-                   col_types = cols(
-                     health_zone = col_character(),
-                     health_area = col_character(),
-                     village = col_character(),
-                     house_number = col_character(),
-                     lat_dd = col_double(),
-                     long_dd = col_double()
-                   ))
 
-drc <- geodata::gadm("COD", level = 0)
-drc_l2 <- geodata::gadm("COD", level = 2)
+# Confirm the number of environmental covariate layers.
 
-## MESS
-# generate multivariate environmental similarity surface using
-# dismo, which works only with raster :eyeroll: 
-# per Elith et al. 2010
+nlyr(
+  kc_covariates
+)
+
+
+# Check the names of the environmental covariates.
+
+names(
+  kc_covariates
+)
+
+
+# The raster stack contains nine environmental covariates:
+#
+# - four principal components summarising climatic variation
+#   (bioclim_pc1 to bioclim_pc4); and
+# - five principal components summarising land-cover variation
+#   (landcover_pc1 to landcover_pc5).
+#
+# PCA was used to reduce collinearity and dimensionality among
+# the original environmental variables while retaining at least
+# 90% of the environmental variation represented at the
+# sampled household locations.
+
+# 3. Load DRC environmental covariates
+
+# Load the environmental PCA covariates prepared
+# for the whole Democratic Republic of the Congo.
+#
+# These raster layers contain the same environmental covariates
+# prepared for Kasaï-Central but extend across the whole country.
+
+drc_covariates <- rast(
+  "data/clean/drc_covariates.tif"
+)
+
+
+# Confirm the number of environmental covariate layers.
+
+nlyr(
+  drc_covariates
+)
+
+
+# Check the names of the environmental covariates.
+
+names(
+  drc_covariates
+)
+
+
+# The DRC raster stack contains the same nine environmental covariates:
+#
+# - four principal components summarising climatic variation
+#   (bioclim_pc1 to bioclim_pc4); and
+# - five principal components summarising land-cover variation
+#   (landcover_pc1 to landcover_pc5).
+
+
+# 4. Confirm Kasaï-Central and DRC covariates match
+
+# Confirm that the Kasaï-Central and DRC raster stacks
+# contain exactly the same environmental covariates
+# in the same order.
+#
+# This is required because the environmental similarity
+# analysis must compare equivalent environmental variables.
+
+identical(
+  names(kc_covariates),
+  names(drc_covariates)
+)
+
+
+# 5. Load household environmental covariates
+
+# Load the environmental covariate values extracted
+# at the 650 sampled household locations.
+#
+# These household-level environmental conditions will define
+# the reference environmental space used in the MESS analysis.
+
+household_covariates <- read_csv(
+  "data/clean/coords_covariates.csv",
+  show_col_types = FALSE
+)
+
+
+# Inspect the structure of the household covariate dataset.
+
+glimpse(
+  household_covariates
+)
+
+
+
+# 6. Confirm household and raster covariates match
+
+# Retain only the environmental covariates extracted
+# at the sampled household locations.
+
+household_environment <- household_covariates |>
+  select(
+    starts_with("bioclim_pc"),
+    starts_with("landcover_pc")
+  )
+
+
+# Confirm that the household environmental covariates
+# have exactly the same names and order as the
+# Kasaï-Central raster covariates.
+
+identical(
+  names(household_environment),
+  names(kc_covariates)
+)
+
+
+# 7. Check for missing household environmental covariates
+
+# Check for missing values in the environmental covariates
+# extracted at the sampled household locations.
+#
+# Missing values could affect the MESS calculation and should
+# therefore be identified before continuing.
+
+missing_household_covariates <- colSums(
+  is.na(
+    household_environment
+  )
+)
+
+
+# Display the number of missing values for each
+# environmental covariate.
+
+missing_household_covariates
+
+
+# 8. Prepare Kasaï-Central covariates for MESS analysis
+
+# Multivariate Environmental Similarity Surface (MESS)
+#
+# MESS evaluates whether environmental conditions across
+# Kasaï-Central are similar to the environmental conditions
+# represented at the 650 sampled household locations.
+#
+# kc_covariates represents environmental conditions across
+# Kasaï-Central using the nine environmental PCA covariates.
+#
+# household_environment represents the environmental conditions
+# observed at the sampled household locations.
+#
+# Positive MESS values indicate environmental conditions represented
+# within the sampled environmental space.
+#
+# Negative MESS values indicate novel environmental conditions
+# outside the sampled environmental space, where model predictions
+# would require environmental extrapolation.
+#
+# Method: Elith et al. (2010)
 # https://doi.org/10.1111/j.2041-210X.2010.00036.x
 
-#vic comment:  # Are the environments in my raster map across Kasaï-Central 
-#similar to the environments where I sampled mosquitoes?
-#the raster map across KC is my stack of environmental PCA layers
-#so MESS need to compare covraster (the environmental conditions everywhere across KC raster)
-#and coord_covs (environmental conditions at sampled households)
-#let do it
-# for my better understanding I found this paper 
-# http://www.malariajournal.com/content/13/1/213 
-#https://link.springer.com/article/10.1186/s13071-023-05912-z and 
-# I still continue to read it 
-covraster <- brick(covs)
-mess_drc <- mess(
-  x = covraster,
-  v = coord_covs |>
-    dplyr::select(-health_zone, 
-                  -health_area, 
-                  -village, 
-                  -house_number,
-                  -lat_dd,
-                  -long_dd,
-                  -precision) |>
-    as.data.frame()
+
+# Convert the Kasaï-Central environmental covariates
+# from a terra SpatRaster to a RasterBrick.
+#
+# This conversion is required because dismo::mess()
+# accepts Raster* objects from the raster package.
+
+kc_covariates_raster <- raster::brick(
+  kc_covariates
+)
+
+
+# Inspect the converted raster.
+
+kc_covariates_raster
+
+
+# 9. Calculate environmental similarity across Kasaï-Central
+
+# Calculate the Multivariate Environmental Similarity Surface (MESS)
+# across Kasaï-Central.
+#
+# x contains the nine environmental covariate layers
+# across Kasaï-Central.
+#
+# v contains the environmental covariate values observed
+# at the 650 sampled household locations.
+#
+# The resulting raster gives one MESS value for each raster cell.
+
+kc_mess <- dismo::mess(
+  x = kc_covariates_raster,
+  v = as.data.frame(
+    household_environment
+  )
 ) |>
   rast()
 
-plot(mess_drc)
 
-# plot with palette that diverges around zero
-mess_drc_plot <- mess_drc
+# Inspect the resulting MESS raster.
 
-mess_drc_plot[is.infinite(values(mess_drc_plot))] <- NA
+kc_mess
 
-mess_limit <- max(
-  abs(values(mess_drc_plot)),
+# The MESS raster contains one layer describing environmental
+# similarity across Kasaï-Central.
+
+# Positive MESS values indicate environmental conditions that
+# fall within the range represented by the sampled households.
+
+# Negative MESS values indicate environmental conditions outside
+# the range represented by the sampled households.
+
+# These negative values correspond to environmental extrapolation,
+# where model predictions are less strongly supported by the
+# observed survey data.
+
+# 10. Summarise the Kasaï-Central MESS surface
+
+# Summarise the distribution of MESS values across Kasaï-Central.
+#
+# The minimum value identifies the strongest environmental
+# dissimilarity relative to the sampled household environments.
+#
+# The maximum value identifies the highest environmental similarity.
+#
+# The mean provides an overall summary of environmental similarity
+# across the province.
+
+global(
+  kc_mess,
+  fun = c(
+    "min",
+    "max",
+    "mean"
+  ),
   na.rm = TRUE
 )
 
-plot_mess_local <- ggplot() +
+
+# Visually inspect the spatial distribution of MESS values
+# across Kasaï-Central.
+
+plot(
+  kc_mess
+)
+
+# 11. Mask the MESS surface to the Kasaï-Central boundary
+
+# Load the health-zone boundaries for Kasaï-Central.
+
+kc_health_zones <- st_read(
+  "data/clean/kc_health_zones.gpkg",
+  quiet = TRUE
+)
+
+
+# Combine the 26 health-zone polygons into a single
+# Kasaï-Central provincial boundary.
+
+kc_boundary <- st_union(
+  kc_health_zones
+)
+
+
+# Restrict the MESS surface to the Kasaï-Central boundary.
+#
+# MESS values inside the province remain unchanged,
+# while raster cells outside the province are removed.
+
+kc_mess <- mask(
+  kc_mess,
+  vect(kc_boundary)
+)
+
+
+# Visually inspect the masked MESS surface.
+
+plot(
+  kc_mess
+)
+
+
+# 12. Plot environmental similarity across Kasaï-Central
+
+# Create a copy of the MESS raster for visualisation.
+
+kc_mess_plot <- kc_mess
+
+
+# Replace infinite MESS values with NA so that they
+# do not interfere with the colour scale.
+
+kc_mess_plot[
+  is.infinite(
+    values(kc_mess_plot)
+  )
+] <- NA
+
+
+# Calculate a symmetrical colour-scale limit around zero.
+#
+# This ensures that negative and positive MESS values
+# are displayed using the same absolute range.
+
+mess_limit <- max(
+  abs(
+    values(kc_mess_plot)
+  ),
+  na.rm = TRUE
+)
+
+
+# Create a MESS map showing the 26 health-zone boundaries.
+#
+# Red indicates novel environmental conditions outside
+# the sampled environmental space.
+#
+# White represents values around zero.
+#
+# Blue indicates environmental conditions represented
+# within the sampled environmental space.
+
+plot_kc_mess_hz <- ggplot() +
   geom_spatraster(
-    data = mess_drc_plot
+    data = kc_mess_plot
   ) +
   scale_fill_distiller(
     type = "div",
     palette = "RdBu",
     direction = 1,
-    limits = c(-mess_limit, mess_limit),
-    na.value = "grey"
+    limits = c(
+      -mess_limit,
+      mess_limit
+    ),
+    na.value = "transparent"
+  ) +
+  geom_sf(
+    data = kc_health_zones,
+    fill = NA,
+    colour = "grey75",
+    linewidth = 0.12
+  ) +
+  geom_sf(
+    data = kc_boundary,
+    fill = NA,
+    colour = "black",
+    linewidth = 0.3
   ) +
   theme_void() +
-  labs(fill = "Multivariate\nEnvironmental\nSimilarity")
+  labs(
+    fill = "Multivariate\nEnvironmental\nSimilarity"
+  )
 
-plot_mess_local
 
-# Save plot
-# ggsave(
-#   filename = "output/mess_local.png",
-#   plot = plot_mess_local,
-#   width = 7,
-#   height = 5,
-#   dpi = 300
-# )
+plot_kc_mess_hz
 
-# plot again with village coords
-mess_drc_plot <- mess_drc
-mess_drc_plot[is.infinite(values(mess_drc_plot))] <- NA
 
-mess_limit <- max(
-  abs(values(mess_drc_plot)),
-  na.rm = TRUE
-)
+# Create a second version showing only the
+# Kasaï-Central provincial boundary.
 
-plot_mess_local_coords <- ggplot() +
+plot_kc_mess_province <- ggplot() +
   geom_spatraster(
-    data = mess_drc_plot
+    data = kc_mess_plot
   ) +
   scale_fill_distiller(
     type = "div",
     palette = "RdBu",
     direction = 1,
-    limits = c(-mess_limit, mess_limit),
-    na.value = "grey"
+    limits = c(
+      -mess_limit,
+      mess_limit
+    ),
+    na.value = "transparent"
+  ) +
+  geom_sf(
+    data = kc_boundary,
+    fill = NA,
+    colour = "black",
+    linewidth = 0.3
   ) +
   theme_void() +
-  labs(fill = "Multivariate\nEnvironmental\nSimilarity")  +
+  labs(
+    fill = "Multivariate\nEnvironmental\nSimilarity"
+  )
+
+
+plot_kc_mess_province
+
+# The MESS analysis suggests that most sampled households captured a
+# large proportion of the environmental conditions present across
+# central and southern Kasaï-Central.
+
+# However, several areas in the northern part of the province exhibit
+# strongly negative MESS values.
+
+# These locations contain environmental conditions that were not
+# represented among the 650 sampled households.
+
+# Predictions produced in these areas therefore require environmental
+# extrapolation and should be interpreted with greater caution.
+
+# In contrast, areas with positive MESS values fall within the
+# environmental space represented by the survey data and provide
+# greater confidence for model-based prediction.
+
+# The spatial pattern suggests that environmental coverage was not
+# uniform across Kasaï-Central, with northern health zones exhibiting
+# the greatest environmental dissimilarity relative to sampled
+# household locations.
+
+
+# 13. Add sampled household locations to the MESS maps
+
+# Add the 650 sampled household locations to the MESS maps.
+#
+# These points show the locations that define the
+# reference environmental space used in the MESS analysis.
+
+
+# Add household locations to the map showing
+# health-zone boundaries.
+
+plot_kc_mess_hz_households <- plot_kc_mess_hz +
   geom_point(
-    data = coords,
+    data = household_covariates,
     aes(
       x = long_dd,
       y = lat_dd
     ),
-    col = "grey30"
+    colour = "black",
+    size = 1.2
   )
 
-plot_mess_local_coords
 
-# Save plot
-# ggsave(
-#   filename = "output/mess_local_coords.png",
-#   plot = plot_mess_local_coords,
-#   width = 7,
-#   height = 5,
-#   dpi = 300
-# )
+plot_kc_mess_hz_households
 
 
-# make mask of this, such that anything < 0 is NA,
-# i.e. dissimilar, and >= 0 is 1, i.e., similar.
-#vic understanding 
-#only keep predictions in environments
-#similar to the mosquito sampling environments
-#Remove environmentally different areas
+# Add household locations to the map showing
+# only the Kasaï-Central provincial boundary.
 
-mess_mask <- mess_drc
-
-mvals <- values(mess_drc)
-
-mess_mask[which(mvals < 0)] <- NA
-mess_mask[which(mvals >= 0)] <- 1
-plot(mess_mask)
-
-mess_mask <- terra::resample(
-  mess_mask,
-  prob_household_detection[[1]],
-  method = "near"
-)
-plot(c(mess_mask, prob_household_detection[[1]]))
-
-
-## plot probability of household detections under MESS mask
-#I need to check extends
-# Check extents
-ext(prob_household_detection)
-ext(mess_mask)
-
-mess_mask <- terra::resample(
-  mess_mask,
-  prob_household_detection,
-  method = "near"
-)
-
-#now let take household detection probability map
-#crop it to the same extent as the MESS mask
-#remove areas where MESS < 0
-#So the result keeps predictions only where environments are similar to sampled households
-
-prob_household_detection_mess <- prob_household_detection |>
-  mask(mess_mask)
-
-##then Create a map of household mosquito detection probability
-#only in environmentally reliable areas
-plot_hhdet_mess_local <- ggplot() +
-  geom_spatraster(data = prob_household_detection_mess) +
-  facet_wrap(~lyr) +
-  scale_fill_viridis_c(
-    option = "G",
-    na.value = "white"
-  ) +
-  theme_void()  +
-  labs(
-    title = "Probability of detection in locations environmentally similar to sample sites",
-    fill = "Household\nprobability\nof detection"
-  )
-
-plot_hhdet_mess_local
-
-# ggsave(
-#   filename = "output/plot_hhdet_mess_local.png",
-#   plot = plot_hhdet_mess_local
-# )
-
-
-plot_hhdet_mess_local_coords <- ggplot() +
-  geom_spatraster(data = prob_household_detection_mess) +
-  facet_wrap(~lyr) +
-  scale_fill_distiller(
-    palette = "Blues",
-    direction = 1,
-    na.value = "grey90"
-  ) +
-  theme_void() +
+plot_kc_mess_province_households <- plot_kc_mess_province +
   geom_point(
-    data = coords,
+    data = household_covariates,
     aes(
       x = long_dd,
       y = lat_dd
     ),
-    col = "hotpink"
-  ) +
-  labs(
-    title = "Probability of detection in locations environmentally similar to sample sites",
-    fill = "Household\nprobability\nof detection",
-    caption = "Pink points are sample villages"
+    colour = "black",
+    size = 1.2
   )
 
-plot_hhdet_mess_local_coords
 
-# ggsave(
-#   filename = "output/plot_hhdet_mess_local_coords.png",
-#   plot = plot_hhdet_mess_local_coords
-# )
-
-# predict over whole DRC
-cod_cov_species_dummy <- cod_covs[[1]] * 0
-names(cod_cov_species_dummy) <- "species"
-
-cod_cov_gambiae  <- 
-cod_cov_funestus <- 
-cod_cov_paludis  <- 
-cod_cov_hancocki <- 
-cod_cov_sp       <- 
-cod_cov_moucheti <- 
-cod_cov_ziemanni <- cod_cov_species_dummy
-
-cod_cov_gambiae[]  <- "An. gambiae s.l."
-cod_cov_funestus[] <- "An. funestus gp"
-cod_cov_paludis[]  <- "An. paludis"
-cod_cov_hancocki[] <- "An. hancocki"
-cod_cov_sp[]       <- "An. sp"
-cod_cov_moucheti[] <- "An. moucheti"
-cod_cov_ziemanni[] <- "An. ziemanni"
-
-cod_pred_gambiae <- predict(c(cod_covs, cod_cov_gambiae),
-                            m,
-                            type = "response")
-
-cod_pred_funestus <- predict(c(cod_covs, cod_cov_funestus),
-                             m,
-                             type = "response")
-
-cod_pred_paludis <- predict(c(cod_covs, cod_cov_paludis),
-                            m,
-                            type = "response")
-
-cod_pred_hancocki <- predict(c(cod_covs, cod_cov_hancocki),
-                             m,
-                             type = "response")
-
-cod_pred_sp <- predict(c(cod_covs, cod_cov_sp),
-                       m,
-                       type = "response")
-
-cod_pred_moucheti <- predict(c(cod_covs, cod_cov_moucheti),
-                             m,
-                             type = "response")
-
-cod_pred_ziemanni <- predict(c(cod_covs, cod_cov_ziemanni),
-                             m,
-                             type = "response")
-
-names(cod_pred_gambiae)  <- "An. gambiae s.l."
-names(cod_pred_funestus) <- "An. funestus gp"
-names(cod_pred_paludis)  <- "An. paludis"
-names(cod_pred_hancocki) <- "An. hancocki"
-names(cod_pred_sp)       <- "An. sp"
-names(cod_pred_moucheti) <- "An. moucheti"
-names(cod_pred_ziemanni) <- "An. ziemanni"
+plot_kc_mess_province_households
 
 
-cod_preds <- c(cod_pred_gambiae,
-           cod_pred_funestus,
-           cod_pred_paludis,
-           cod_pred_hancocki,
-           cod_pred_sp,
-           cod_pred_moucheti,
-           cod_pred_ziemanni)
+# 14. Save the Kasaï-Central MESS maps
 
-# compute the probability of detecting each species in a given household
-# 25 households were sampled per health zone/site
-#So the output will be 0 = very unlikely to detect the interest mosquito specie
-# 1 = very likely to detect the interest mosquito specie
 
-cod_prob_household_detection <- 1 - exp(-cod_preds/25)
-
-plot_hhdet_cod <- ggplot() +
-  geom_spatraster(data = cod_prob_household_detection) +
-  facet_wrap(~lyr, ncol = 2) +
-  scale_fill_viridis_c(
-    option = "G",
-    na.value = "white"
-  ) +
-  theme_void() +
-  labs(
-    title = "Probability of detection in environnement similar locations",
-    fill = "Household\nprobability\nof detection",
-  )
-plot_hhdet_cod
+# Save the MESS map showing health-zone boundaries and
+# sampled household locations as a high-resolution
+# PNG with a transparent background.
 
 ggsave(
-  filename = "output/plot_hhdet_cod.png",
-  plot = plot_hhdet_cod,
+  filename = "outputs/figures/kc_mess_health_zones_households.png",
+  plot = plot_kc_mess_hz_households,
   width = 8,
-  height = 6,
-  dpi = 300
+  height = 7,
+  units = "in",
+  dpi = 600,
+  bg = "transparent"
 )
 
 
+# Save the MESS map showing the provincial boundary and
+# sampled household locations as a high-resolution
+# PNG with a transparent background.
 
-# compute the probability of detecting each species in a given household
-# 25 households were sampled per health zone/site
-## plot probability of household detections under MESS mask
-# 
-# prob_household_detection_kc <- prob_household_detection |>
-#   crop(mess_mask) |>
-#   mask(mess_mask)
-# 
-# prob_household_detection_mess <- prob_household_detection_kc |>
-#   mask(mess_mask)
-# 
-# expected_pre_household <- preds / 25
-# 
-# prob_household_detection <- 1 - exp(-expected_pre_household)
-# 
-# 
-# plot_hhdet_local <- ggplot() +
-#   geom_spatraster(data = prob_household_detection) +
-#   facet_wrap(~lyr, ncol = 3) +
-#   scale_fill_viridis_c(
-#     option = "G",
-#     limits = c(0, 1),
-#     na.value = "white"
-#   ) +
-#   theme_void() +
-#   geom_point(
-#     data = coords,
-#     aes(
-#       x = long_dd,
-#       y = lat_dd
-#     ),
-#     col = "hotpink",
-#     size = 0.8
-#   ) +
-#   labs(
-#     title = "Probability of detection in Kasaï-Central",
-#     fill = "Household\nprobability\nof detection",
-#     caption = "Pink points are sampled households"
-#   )
-# 
-# plot_hhdet_local
+ggsave(
+  filename = "outputs/figures/kc_mess_province_households.png",
+  plot = plot_kc_mess_province_households,
+  width = 8,
+  height = 7,
+  units = "in",
+  dpi = 600,
+  bg = "transparent"
+)
 
-# drc <- geodata::gadm("COD", level = 0)
-# drc_l2 <- geodata::gadm("COD", level = 2)
-# 
-# par(mfrow = c(3, 3))
-# 
-# for (i in 1:nlyr(prob_household_detection)) {
-#   plot(prob_household_detection[[i]],
-#        range = c(0, 1),
-#        main = names(prob_household_detection)[i])
-#   
-#   plot(drc_l2, add = TRUE, bg = grey(0.5))
-#   plot(drc, lwd = 2, add = TRUE)
-#   
-#   points(coords$lat_dd ~ coords$long_dd,
-#          pch = 21,
-#          bg = "blue",
-#          cex = 1)
-# }
 
-## National scale MESS
-cod_covraster <- brick(cod_covs)
+# Confirm that both figures were saved successfully.
 
-mess_cod <- mess(
-  x = cod_covraster,
-  v = coord_covs |>
-    dplyr::select(
-      -health_zone,
-      -health_area,
-      -village,
-      -house_number,
-      -lat_dd,
-      -long_dd,
-      -precision
-    ) |>
-    as.data.frame()
+file.exists(
+  "outputs/figures/kc_mess_health_zones_households.png"
+)
+
+file.exists(
+  "outputs/figures/kc_mess_province_households.png"
+)
+
+# 15. Create the Kasaï-Central environmental similarity mask
+
+# Create a binary mask from the Kasaï-Central MESS surface.
+#
+# MESS >= 0 is assigned 1:
+# environmental conditions are represented within the
+# sampled environmental space.
+#
+# MESS < 0 is assigned NA:
+# environmental conditions are novel relative to the
+# sampled environmental space and would require extrapolation.
+
+kc_mess_mask <- ifel(
+  kc_mess >= 0,
+  1,
+  NA
+)
+
+
+# Check the values present in the mask.
+#
+# The expected values are:
+# - 1 for environmentally represented areas; and
+# - NA for novel environmental conditions.
+
+unique(
+  values(kc_mess_mask)
+)
+
+
+# 16. Save Kasaï-Central environmental similarity outputs
+
+# Save the continuous Kasaï-Central MESS surface.
+#
+# This raster retains the full environmental similarity values
+# and can be used for interpretation and visualisation.
+
+writeRaster(
+  kc_mess,
+  "outputs/spatial/kc_mess.tif",
+  overwrite = TRUE
+)
+
+
+# Save the binary environmental similarity mask.
+#
+# Cells with a value of 1 represent environmentally
+# represented conditions.
+#
+# Cells with NA represent novel environmental conditions
+# outside the sampled environmental space.
+
+writeRaster(
+  kc_mess_mask,
+  "outputs/spatial/kc_mess_mask.tif",
+  overwrite = TRUE
+)
+
+
+# 17. Prepare DRC covariates for MESS analysis
+
+# Convert the DRC environmental covariates
+# from a terra SpatRaster to a RasterBrick.
+#
+# This conversion is required because dismo::mess()
+# accepts Raster* objects from the raster package.
+
+drc_covariates_raster <- raster::brick(
+  drc_covariates
+)
+
+
+# Inspect the converted raster.
+
+drc_covariates_raster
+
+
+# 18. Calculate environmental similarity across the DRC
+
+# Calculate the Multivariate Environmental Similarity Surface (MESS)
+# across the whole Democratic Republic of the Congo.
+#
+# x contains the nine environmental covariate layers
+# across the DRC.
+#
+# v contains the environmental covariate values observed
+# at the 650 sampled household locations in Kasaï-Central.
+#
+# The resulting raster gives one MESS value for each raster cell
+# across the country relative to the sampled environmental space.
+
+drc_mess <- dismo::mess(
+  x = drc_covariates_raster,
+  v = as.data.frame(
+    household_environment
+  )
 ) |>
   rast() |>
-  mask(cod_covs[[1]])
+  mask(
+    drc_covariates[[1]]
+  )
 
-plot(mess_cod)
 
-# plot with palette that diverges around zero
+# Inspect the resulting DRC MESS raster.
 
-# generate plot limits for palette divergence
-# something creating inf max value, but min real value is greatest absolute
-# so using that instead
-cod_mess_limit <- abs(min(values(mess_cod), na.rm = TRUE)) * c(-1, 1)
+drc_mess
 
-plot_mess_cod <- ggplot() +
-  geom_spatraster(
-    data = mess_cod
-  ) +
-  scale_fill_distiller(
-    type = "div",
-    palette = "RdBu",
-    direction = 1,
-    limit = cod_mess_limit,
-    na.value = "transparent"
-  ) +
-  theme_void() +
-  labs(fill = "Multivariate\nEnvironmental\nSimilarity")
 
-plot_mess_cod
+# 20. Prepare the DRC MESS surface for visualisation
 
-ggsave(
-  filename = "output/mess_cod.png",
-  plot = plot_mess_cod,
-  width = 8,
-  height = 6,
-  dpi = 300
+drc_mess_plot <- drc_mess
+
+
+# Replace infinite values with NA.
+
+drc_mess_plot[
+  is.infinite(
+    values(drc_mess_plot)
+  )
+] <- NA
+
+
+# 21. Plot environmental similarity across the DRC
+
+drc_boundary <- geodata::gadm(
+  country = "COD",
+  level = 0,
+  path = "data/downloads"
 )
 
-# plot again with village coords
-plot_mess_cod_coords <- ggplot() +
+
+plot_drc_mess <- ggplot() +
   geom_spatraster(
-    data = mess_cod
+    data = drc_mess_plot
   ) +
   scale_fill_distiller(
     type = "div",
     palette = "RdBu",
     direction = 1,
-    limit = cod_mess_limit,
+    limits = c(
+      -100,
+      100
+    ),
+    breaks = c(
+      -100,
+      0,
+      100
+    ),
+    oob = scales::squish,
     na.value = "transparent"
   ) +
+  geom_spatvector(
+    data = drc_boundary,
+    fill = NA,
+    colour = "black",
+    linewidth = 0.3
+  ) +
   theme_void() +
-  labs(fill = "Multivariate\nEnvironmental\nSimilarity")  +
+  labs(
+    fill = "Multivariate\nEnvironmental\nSimilarity"
+  )
+
+
+plot_drc_mess
+
+
+# 23. Load DRC provincial boundaries
+
+drc_provinces <- geodata::gadm(
+  country = "COD",
+  level = 1,
+  path = "data/downloads"
+)
+
+
+# 24. Add provincial boundaries and highlight Kasaï-Central
+
+plot_drc_mess_provinces <- plot_drc_mess +
+  geom_spatvector(
+    data = drc_provinces,
+    fill = NA,
+    colour = "white",
+    linewidth = 0.45
+  ) +
+  geom_spatvector(
+    data = drc_provinces,
+    fill = NA,
+    colour = "grey35",
+    linewidth = 0.18
+  ) +
+  geom_sf(
+    data = kc_boundary,
+    fill = NA,
+    colour = "black",
+    linewidth = 0.9
+  ) +
+  geom_spatvector(
+    data = drc_boundary,
+    fill = NA,
+    colour = "black",
+    linewidth = 0.45
+  )
+
+
+plot_drc_mess_provinces
+
+
+# Add the sampled household locations to the final DRC MESS map.
+#
+# These points show where the environmental reference conditions
+# used in the MESS analysis were observed.
+
+plot_drc_mess_provinces_households <- plot_drc_mess_provinces +
   geom_point(
-    data = coords,
+    data = household_covariates,
     aes(
       x = long_dd,
       y = lat_dd
     ),
-    col = "grey30"
+    colour = "black",
+    size = 1.2
   )
 
-plot_mess_cod_coords
 
-# ggsave(
-#   filename = "output/mess_cod_coords.png",
-#   plot = plot_mess_cod_coords,
-#   width = 8,
-#   height = 6,
-#   dpi = 300
+# Display the final DRC MESS map.
+
+plot_drc_mess_provinces_households
+
+
+# # 25. Prepare DRC provinces for environmental representation analysis
+# 
+# # Assign a unique numeric ID to each of the 26 DRC provinces.
+# #
+# # These IDs will allow each raster cell to be linked
+# # to the province in which it occurs.
+# 
+# drc_provinces$province_id <- seq_len(
+#   nrow(drc_provinces)
 # )
-
-# make mask of this, such that anything < 0 is NA,
-# i.e. dissimilar, and >= 0 is 1, i.e., similar.
-mess_mask_cod <- mess_cod
-
-mvals_cod <- values(mess_cod)
-
-naidx_cod <- which(is.na(mvals_cod))
-
-naidx_cod_mess <- c(naidx_cod, which(mvals_cod < 0))
-mess_mask_cod[which(mvals_cod < 0)] <- NA
-mess_mask_cod[which(mvals_cod >= 0)] <- 1
-
-plot(mess_mask_cod)
-
-plot(c(mess_mask_cod, cod_prob_household_detection[[1]]))
-
-cod_prob_household_detection_mess <- cod_prob_household_detection |>
-  mask(mess_mask_cod)
-
-cod_prob_household_detection <- writereadrast(
-  cod_prob_household_detection,
-  "cod_prob_household_detection.tif"
-)
-
-
-# par(mfrow = c(2, 2))
-# for (i in 1:4) {
-#   plot(drc, lwd = 2)
-#   plot(prob_household_detection[[i]],
-#        range = c(0, 1),
-#        main = names(prob_household_detection)[i], add = TRUE)
-#   plot(drc_l2, add = TRUE, bg = grey(0.5))
-#   plot(drc, lwd = 2, add = TRUE)
-#   points(coords$lat_dd ~ coords$long_dd,
-#          pch = 21,
-#          bg = "blue",
-#          cex = 1)
-# }
 # 
 # 
-# write_csv(
-#   coord_covs,
-#   file = "data/clean/coords_covariates.csv"
+# # Check the province names and their corresponding IDs.
+# 
+# drc_provinces[
+#   ,
+#   c(
+#     "province_id",
+#     "NAME_1"
+#   )
+# ]
+# 
+# 
+# # Convert the provincial boundaries to a raster using
+# # the DRC MESS raster as the spatial template.
+# #
+# # Each raster cell receives the numeric ID of the
+# # province in which it is located.
+# 
+# drc_province_raster <- rasterize(
+#   drc_provinces,
+#   drc_mess,
+#   field = "province_id"
 # )
+# 
+# 
+# # Inspect the resulting province raster.
+# 
+# drc_province_raster
+
+
+# # 26. Quantify environmental representation by DRC province
+# 
+# # Calculate the area of each DRC MESS raster cell
+# # in square kilometres.
+# #
+# # Cells without MESS information remain NA.
+# 
+# drc_cell_area <- cellSize(
+#   drc_mess,
+#   unit = "km",
+#   mask = TRUE
+# )
+# 
+# names(
+#   drc_cell_area
+# ) <- "area_km2"
+# 
+# 
+# # Classify each raster cell according to its
+# # environmental representation.
+# #
+# # 1 = MESS >= 0:
+# #     environmentally represented.
+# #
+# # 0 = MESS < 0:
+# #     environmentally dissimilar.
+# 
+# drc_represented <- ifel(
+#   drc_mess >= 0,
+#   1,
+#   0
+# )
+# 
+# names(
+#   drc_represented
+# ) <- "represented"
+# 
+# 
+# # Combine the province ID and environmental representation
+# # into a single zone code.
+# #
+# # For example:
+# #
+# # province 8 + dissimilar area -> 80
+# # province 8 + represented area -> 81
+# #
+# # This allows represented and dissimilar areas for all
+# # provinces to be summarised in one operation.
+# 
+# zone_code <- (
+#   drc_province_raster * 10
+# ) + drc_represented
+# 
+# names(
+#   zone_code
+# ) <- "zone_code"
+# 
+# 
+# # Sum the raster-cell area for each combination
+# # of province and environmental representation.
+# 
+# zonal_result <- zonal(
+#   drc_cell_area,
+#   zone_code,
+#   fun = "sum",
+#   na.rm = TRUE
+# ) |>
+#   as_tibble()
+# 
+# 
+# # Inspect the resulting area summary.
+# 
+# zonal_result
+# 
+# 
+# # 27. Create the province-level environmental representation summary
+# 
+# # Decode the zone code into:
+# #
+# # - province_id: identifies the DRC province; and
+# # - represented: identifies whether the environmental
+# #   conditions are represented or dissimilar.
+# #
+# # For example:
+# #
+# # 81 -> province 8, represented
+# # 80 -> province 8, dissimilar
+# 
+# province_mess_long <- zonal_result |>
+#   mutate(
+#     province_id = zone_code %/% 10,
+#     represented = zone_code %% 10
+#   ) |>
+#   select(
+#     province_id,
+#     represented,
+#     area_km2
+#   )
+# 
+# 
+# # Add any missing province × representation combinations.
+# #
+# # If a province has no raster cells in one category,
+# # its area for that category is assigned 0.
+# 
+# province_mess_long <- province_mess_long |>
+#   tidyr::complete(
+#     province_id = seq_len(
+#       nrow(drc_provinces)
+#     ),
+#     represented = c(
+#       0,
+#       1
+#     ),
+#     fill = list(
+#       area_km2 = 0
+#     )
+#   )
+# 
+# 
+# # Create a lookup table linking province IDs
+# # to the names of the 26 DRC provinces.
+# 
+# province_lookup <- as.data.frame(
+#   drc_provinces
+# ) |>
+#   select(
+#     province_id,
+#     province = NAME_1
+#   )
+# 
+# 
+# # Create one row per province and calculate
+# # the percentage of environmentally represented
+# # and environmentally dissimilar area.
+# 
+# province_mess_summary <- province_mess_long |>
+#   left_join(
+#     province_lookup,
+#     by = "province_id"
+#   ) |>
+#   select(
+#     province,
+#     represented,
+#     area_km2
+#   ) |>
+#   pivot_wider(
+#     names_from = represented,
+#     values_from = area_km2,
+#     names_prefix = "area_"
+#   ) |>
+#   rename(
+#     dissimilar_km2 = area_0,
+#     represented_km2 = area_1
+#   ) |>
+#   mutate(
+#     total_area_km2 =
+#       represented_km2 + dissimilar_km2,
+#     
+#     percent_represented =
+#       100 * represented_km2 / total_area_km2,
+#     
+#     percent_dissimilar =
+#       100 * dissimilar_km2 / total_area_km2
+#   ) |>
+#   arrange(
+#     desc(percent_represented)
+#   )
+# 
+# 
+# # Display the results for all 26 provinces.
+# 
+# print(
+#   province_mess_summary,
+#   n = 26
+# )
+# 
+# 
+# # 28. Summarise environmental representation across DRC provinces
+# 
+# # Count the number of provinces containing at least some
+# # environmentally represented area and the number with none.
+# #
+# # A province with percent_represented > 0 contains at least
+# # some environmental conditions represented by the
+# # Kasaï-Central sampled household environments.
+# #
+# # A province with percent_represented == 0 is entirely outside
+# # the sampled environmental space.
+# 
+# province_representation_count <- province_mess_summary |>
+#   summarise(
+#     total_provinces = n(),
+#     
+#     provinces_with_representation =
+#       sum(percent_represented > 0),
+#     
+#     provinces_without_representation =
+#       sum(percent_represented == 0)
+#   )
+# 
+# 
+# # Display the summary.
+# 
+# province_representation_count
+# 
+# 
+# # 29. Plot environmental representation by DRC province
+# 
+# # Create a horizontal bar plot showing the percentage
+# # of environmentally represented area in each DRC province.
+# #
+# # Provinces are ordered from the lowest to the highest
+# # percentage of environmentally represented area.
+# #
+# # Kasaï-Central is highlighted because the sampled households
+# # defining the reference environmental space are located there.
+# 
+# plot_province_mess <- province_mess_summary |>
+#   mutate(
+#     province = forcats::fct_reorder(
+#       province,
+#       percent_represented
+#     ),
+#     study_province = if_else(
+#       province == "Kasaï-Central",
+#       "Kasaï-Central",
+#       "Other provinces"
+#     )
+#   ) |>
+#   ggplot(
+#     aes(
+#       x = percent_represented,
+#       y = province,
+#       fill = study_province
+#     )
+#   ) +
+#   geom_col(
+#     width = 0.75
+#   ) +
+#   scale_fill_manual(
+#     values = c(
+#       "Kasaï-Central" = "black",
+#       "Other provinces" = "grey70"
+#     )
+#   ) +
+#   labs(
+#     x = "Environmentally represented area (%)",
+#     y = NULL,
+#     fill = NULL
+#   ) +
+#   theme_classic() +
+#   theme(
+#     legend.position = "top"
+#   )
+# 
+# 
+# # Display the plot.
+# 
+# plot_province_mess
+# 
+# 
+# # 30. Create the DRC environmental similarity mask
+# 
+# # Create a binary environmental similarity mask for the DRC.
+# #
+# # MESS >= 0 is assigned 1:
+# # environmental conditions are represented within the
+# # Kasaï-Central sampled environmental space.
+# #
+# # MESS < 0 is assigned NA:
+# # environmental conditions are novel relative to the
+# # sampled environmental space and would require extrapolation.
+# 
+# drc_mess_mask <- ifel(
+#   drc_mess >= 0,
+#   1,
+#   NA
+# )
+# 
+# 
+# # Check the values present in the mask.
+# #
+# # Expected values:
+# # - 1 for environmentally represented areas; and
+# # - NA for novel environmental conditions.
+# 
+# unique(
+#   values(drc_mess_mask)
+# )
+# 
+# 
+# # 31. Save DRC environmental similarity outputs
+# 
+# # Save the continuous DRC MESS surface.
+# #
+# # This raster retains the full environmental similarity values
+# # across the country for interpretation and visualisation.
 # 
 # writeRaster(
-#   prob_household_detection,
-#   "output/spatial/prob_household_detection.tif",
+#   drc_mess,
+#   "outputs/spatial/drc_mess.tif",
 #   overwrite = TRUE
 # )
 # 
-# saveRDS(
-#   m,
-#   file = "output/model.Rds"
+# 
+# # Save the DRC environmental similarity mask.
+# #
+# # Cells with a value of 1 represent environmentally
+# # represented conditions.
+# #
+# # Cells with NA represent novel environmental conditions
+# # outside the sampled environmental space.
+# 
+# writeRaster(
+#   drc_mess_mask,
+#   "outputs/spatial/drc_mess_mask.tif",
+#   overwrite = TRUE
 # )
+# 
+# 
+# # Confirm that both raster outputs were saved successfully.
+# 
+# file.exists(
+#   "outputs/spatial/drc_mess.tif"
+# )
+# 
+# file.exists(
+#   "outputs/spatial/drc_mess_mask.tif"
+# )
+# 
+# 
+# # 32. Save DRC province-level results and figures
+# 
+# # Save the province-level environmental representation summary.
+# #
+# # For each of the 26 DRC provinces, the table contains:
+# #
+# # - environmentally represented area in km2;
+# # - environmentally dissimilar area in km2;
+# # - total evaluated area in km2;
+# # - percentage represented; and
+# # - percentage dissimilar.
+# 
+# write_csv(
+#   province_mess_summary,
+#   "outputs/drc_province_mess_summary.csv"
+# )
+# 
+# 
+# # Confirm that the table was saved successfully.
+# 
+# file.exists(
+#   "outputs/drc_province_mess_summary.csv"
+# )
+# 
+# 
+# # Save the DRC MESS map showing:
+# #
+# # - environmental similarity across the country;
+# # - provincial boundaries;
+# # - Kasaï-Central highlighted; and
+# # - the sampled household locations.
+# 
+# ggsave(
+#   filename = "outputs/figures/drc_mess_provinces_households.png",
+#   plot = plot_drc_mess_provinces_households,
+#   width = 10,
+#   height = 8,
+#   units = "in",
+#   dpi = 600,
+#   bg = "transparent"
+# )
+# 
+# 
+# # Save the province-level environmental representation plot.
+# 
+# ggsave(
+#   filename = "outputs/figures/drc_province_mess_representation.png",
+#   plot = plot_province_mess,
+#   width = 9,
+#   height = 7,
+#   units = "in",
+#   dpi = 600,
+#   bg = "transparent"
+# )
+# 
