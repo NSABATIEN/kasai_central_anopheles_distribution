@@ -1,4 +1,3 @@
-
 ###### READ AND EXPLORE THE KASAÏ-CENTRAL ENTOMOLOGICAL DATABASE ###############
 
 # This script reads the most recent version of the Kasaï-Central mosquito
@@ -19,7 +18,6 @@
 ## Prepares spatial datasets for mapping and exploratory analyses.
 ## Produces figures describing mosquito count, species composition,
 ##and spatial patterns across Kasaï-Central.
-
 
 # 1. Load packages -------------------------------------------------------------
 
@@ -83,7 +81,7 @@ files <- list.files(
 
 latest_file <- files[
   which.max(file.info(files)$mtime)
-  ]
+]
 
 
 # 5. Check the selected database export ----------------------------------------
@@ -112,7 +110,6 @@ print(latest_file)
 # - time_collection: collection timing data
 # - housing_details: household characteristics
 # - definitions: database variable definitions
-
 
 excel_sheets(latest_file)
 
@@ -148,6 +145,17 @@ kc_location <- read_excel(
 ) |>
   clean_names()
 
+kc_time <- read_excel(
+  latest_file,
+  sheet = "time_collection"
+) |>
+  clean_names() |>
+  mutate(
+    time_on = hms::as_hms(start_time_anopheles_collection),
+    time_off = hms::as_hms(end_time_anopheles_collection),
+    duration_mins = (time_off - time_on) / 60
+  )
+
 
 # 8. Check the imported mosquito collection dataset -----------------------------
 
@@ -179,7 +187,7 @@ kc_mosq <- kc_mosq |>
   mutate(
     date = convert_to_date(
       date,
-      character_fun = lubridate::dmy 
+      character_fun = lubridate::dmy
     )
   )
 
@@ -225,12 +233,10 @@ collection_month_check |>
 # The timing of month_1 and month_2 is examined in more detail after
 # correcting these date-entry errors.
 
-
 # 11. Identify and correct collection-date errors -----------------------------
 
 # Identify month_9 records with collection years outside the expected
 # 2025 calendar year.
-
 
 month_9_date_errors <- kc_mosq |>
   filter(
@@ -264,10 +270,15 @@ kc_mosq <- kc_mosq |>
         health_area == "Lubuwa" &
         village == "Katende" &
         collection_month == "month_9" &
-        house_number %in% c(
-          "H02", "H03", "H04",
-          "H05", "H06", "H07"
-        ),
+        house_number %in%
+          c(
+            "H02",
+            "H03",
+            "H04",
+            "H05",
+            "H06",
+            "H07"
+          ),
       as.Date("2025-12-18"),
       date
     )
@@ -317,10 +328,11 @@ collection_month_check |>
 
 collection_month_1_2_summary <- kc_mosq |>
   filter(
-    collection_month %in% c(
-      "month_1",
-      "month_2"
-    )
+    collection_month %in%
+      c(
+        "month_1",
+        "month_2"
+      )
   ) |>
   group_by(
     health_zone,
@@ -383,7 +395,6 @@ collection_month_1_2_summary |>
 #
 # Therefore, month_1 and month_2 can both contain May 2025 collection dates
 # without indicating an error in the collection_month variable.
-
 
 # 13. Create readable labels for the collection months ------------------------
 
@@ -483,7 +494,7 @@ p_month <- kc_mosq_plot |>
 
 # Display the monthly household abundance plot.
 
-p_month 
+p_month
 
 
 # Calculate the mean Anopheles count per household for each collection month.
@@ -533,7 +544,6 @@ overall_mean_anopheles
 # This helps determine whether observations appearing as boxplot outliers
 # correspond to plausible household mosquito collections.
 
-
 kc_mosq_plot |>
   filter(
     collection_month == "month_1",
@@ -575,6 +585,7 @@ total_anopheles_by_month <- kc_mosq_plot |>
 # Display the total Anopheles count for each collection month.
 
 total_anopheles_by_month
+
 
 # Visualise variation in total Anopheles counts across collection months.
 #
@@ -646,7 +657,6 @@ p_month_total
 # from the intervention, seasonal variation, environmental conditions,
 # or a combination of these factors.
 
-
 # 16. Visualise household Anopheles counts by health zone and collection month -
 
 # Compare the distribution of household Anopheles counts among the
@@ -667,7 +677,7 @@ p_zone_month <- kc_mosq_plot |>
   ) +
   geom_boxplot() +
   facet_wrap(
-    ~ collection_month_label,
+    ~collection_month_label,
     ncol = 4
   ) +
   labs(
@@ -723,7 +733,6 @@ p_zone_month
 # subsequent decline in mosquito counts was related to the intervention,
 # seasonal changes, environmental conditions, or a combination of these factors.
 
-
 # 17. Prepare the species-level dataset ---------------------------------------
 
 # The kc_species object contains the individual mosquito records
@@ -740,7 +749,6 @@ p_zone_month
 #
 # factor() also preserves the chronological order of collection months
 # in subsequent tables and figures.
-
 
 kc_species_plot <- kc_species |>
   mutate(
@@ -783,7 +791,6 @@ kc_species_plot |>
 #
 # Use the same date-conversion approach applied previously to the
 # household mosquito dataset.
-
 
 kc_species_plot <- kc_species_plot |>
   mutate(
@@ -1044,7 +1051,6 @@ p_species_by_month
 # Therefore, species that were not collected in a household must be
 # represented by a count of zero.
 
-
 # Keep the 7,800 household collection events from the household dataset.
 
 household_collection_events <- kc_mosq_plot |>
@@ -1187,7 +1193,7 @@ p_gambiae_household <- household_species_count |>
     size = 2
   ) +
   facet_wrap(
-    ~ collection_month_label,
+    ~collection_month_label,
     ncol = 4
   ) +
   labs(
@@ -1270,11 +1276,9 @@ species_plot_labels <- list(
 # - the diamond represents the mean household count.
 
 plot_household_species_counts <- function(species_name) {
-
   # Retrieve the formatted scientific name for the selected taxon.
 
   species_label <- species_plot_labels[[species_name]]
-
 
   # Create the figure title and x-axis label.
 
@@ -1288,7 +1292,6 @@ plot_household_species_counts <- function(species_name) {
     .(species_label) *
       " count per household"
   )
-
 
   # Filter the household-level dataset to the selected taxon
   # and create the household count distribution plot.
@@ -1321,7 +1324,7 @@ plot_household_species_counts <- function(species_name) {
       size = 2
     ) +
     facet_wrap(
-      ~ collection_month_label,
+      ~collection_month_label,
       ncol = 4
     ) +
     labs(
@@ -1596,12 +1599,12 @@ plot_species_count_hz <- species_count_per_health_zone |>
   scale_fill_manual(
     values = c(
       "An. gambiae s.l." = "firebrick",
-      "An. funestus gp"  = "goldenrod",
-      "An. paludis"      = "mediumpurple",
-      "An. hancocki"     = "forestgreen",
-      "An. sp."          = "grey50",
-      "An. moucheti"     = "darkturquoise",
-      "An. ziemanni"     = "deeppink"
+      "An. funestus gp" = "goldenrod",
+      "An. paludis" = "mediumpurple",
+      "An. hancocki" = "forestgreen",
+      "An. sp." = "grey50",
+      "An. moucheti" = "darkturquoise",
+      "An. ziemanni" = "deeppink"
     ),
     labels = c(
       "An. gambiae s.l." = expression(
@@ -1682,7 +1685,6 @@ plot_species_count_hz
 #   showWarnings = FALSE
 # )
 
-
 # Save the figure as a high-resolution PNG.
 #
 # A resolution of 600 dpi is suitable for posters, publications,
@@ -1700,7 +1702,6 @@ plot_species_count_hz
 #   dpi = 600,
 #   bg = "white"
 # )
-
 
 # 29. Summarise monthly Anopheles counts by health zone ------------------------
 
@@ -1775,7 +1776,6 @@ health_zone_monthly_counts |>
 # These results show spatial and temporal variation in mosquito counts
 # across the study area.
 
-
 # 30. Summarise Anopheles counts for each health zone -------------------------
 
 # Summarise mosquito counts across the 12 collection months
@@ -1842,13 +1842,12 @@ sum(
 # These categories are descriptive only and do not represent
 # entomological or malaria-risk thresholds.
 
-
 health_zone_count_summary <- health_zone_count_summary |>
   mutate(
     count_group = case_when(
       max_monthly_count >= 100 ~ "High count",
-      max_monthly_count >= 30  ~ "Medium count",
-      TRUE                     ~ "Low count"
+      max_monthly_count >= 30 ~ "Medium count",
+      TRUE ~ "Low count"
     )
   )
 
@@ -1954,7 +1953,6 @@ kc_taxon_summary_grouped |>
 # Each health zone contributes 84 records:
 # 12 collection months × 7 Anopheles taxa.
 
-
 # 34. Order health zones within the count groups -------------------------------
 
 # Use arrange() to order health zones first by count group
@@ -2038,7 +2036,7 @@ separator_positions
 
 
 # 36. Define colours for Anopheles species -------------------------------------
- 
+
 # Create a named vector containing the colour assigned
 # to each Anopheles taxon.
 
@@ -2047,12 +2045,12 @@ separator_positions
 
 species_colors <- c(
   "An. gambiae s.l." = "firebrick",
-  "An. funestus gp"  = "goldenrod",
-  "An. paludis"      = "mediumpurple",
-  "An. hancocki"     = "forestgreen",
-  "An. sp."          = "grey50",
-  "An. moucheti"     = "darkturquoise",
-  "An. ziemanni"     = "deeppink"
+  "An. funestus gp" = "goldenrod",
+  "An. paludis" = "mediumpurple",
+  "An. hancocki" = "forestgreen",
+  "An. sp." = "grey50",
+  "An. moucheti" = "darkturquoise",
+  "An. ziemanni" = "deeppink"
 )
 
 # Check the species colour vector.
@@ -2060,8 +2058,6 @@ species_colors <- c(
 species_colors
 
 # Prepare a complete species legend
-
-
 
 # 37. Plot monthly Anopheles species counts for High-count health zones --------
 
@@ -2156,62 +2152,61 @@ p_high_count <- kc_taxon_summary_grouped |>
   ) +
   theme_bw() +
   theme(
-    
     # Format the health-zone and count-group labels.
-    
+
     strip.background = element_rect(
       fill = "grey90",
       colour = "black"
     ),
-    
+
     strip.text.x = element_text(
       face = "bold",
       size = 8
     ),
-    
+
     strip.text.y.left = element_text(
       face = "bold",
       size = 11,
       angle = 90
     ),
-    
+
     # Hide collection-month labels in the High-count row.
     #
     # Month labels will be displayed only in the bottom row
     # of the final combined figure.
-    
+
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    
+
     # Simplify the panel grid.
-    
+
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    
+
     panel.grid.major.y = element_line(
       colour = "grey85",
       linewidth = 0.3
     ),
-    
+
     panel.grid.minor.y = element_blank(),
-    
+
     axis.title.x = element_blank(),
-    
+
     axis.text.y = element_text(
       size = 8
     ),
-    
+
     axis.title.y = element_text(
       size = 11
     ),
-    
+
     # The species legend will be displayed beside
     # the Medium-count row in the final combined figure.
-    
+
     legend.position = "none",
-    
+
     # Keep health-zone panels close together.
-    
+
     panel.spacing.x = grid::unit(
       0.05,
       "lines"
@@ -2317,72 +2312,71 @@ p_medium_count <- kc_taxon_summary_grouped |>
   ) +
   theme_bw() +
   theme(
-    
     # Format the health-zone and count-group labels.
-    
+
     strip.background = element_rect(
       fill = "grey90",
       colour = "black"
     ),
-    
+
     strip.text.x = element_text(
       face = "bold",
       size = 8
     ),
-    
+
     strip.text.y.left = element_text(
       face = "bold",
       size = 11,
       angle = 90
     ),
-    
+
     # Hide collection-month labels in the Medium-count row.
     #
     # Month labels will be displayed only in the bottom row
     # of the final combined figure.
-    
+
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    
+
     # Simplify the panel grid.
-    
+
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    
+
     panel.grid.major.y = element_line(
       colour = "grey85",
       linewidth = 0.3
     ),
-    
+
     panel.grid.minor.y = element_blank(),
-    
+
     axis.title.x = element_blank(),
-    
+
     axis.text.y = element_text(
       size = 8
     ),
-    
+
     axis.title.y = element_text(
       size = 11
     ),
-    
+
     # Display the species legend beside
     # the Medium-count row.
-    
+
     legend.position = "right",
     legend.justification = "center",
     legend.background = element_blank(),
-    
+
     legend.title = element_text(
       size = 13
     ),
-    
+
     legend.text = element_text(
       size = 10
     ),
-    
+
     # Keep health-zone panels close together.
-    
+
     panel.spacing.x = grid::unit(
       0.05,
       "lines"
@@ -2485,66 +2479,65 @@ p_low_count <- kc_taxon_summary_grouped |>
   ) +
   theme_bw() +
   theme(
-    
     # Format the health-zone and count-group labels.
-    
+
     strip.background = element_rect(
       fill = "grey90",
       colour = "black"
     ),
-    
+
     strip.text.x = element_text(
       face = "bold",
       size = 8
     ),
-    
+
     strip.text.y.left = element_text(
       face = "bold",
       size = 11,
       angle = 90
     ),
-    
+
     # Display collection-month labels in the bottom row
     # of the final combined figure.
-    
+
     axis.text.x = element_text(
       angle = 90,
       hjust = 1,
       vjust = 0.5,
       size = 6
     ),
-    
+
     axis.ticks.x = element_blank(),
-    
+
     # Simplify the panel grid.
-    
+
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    
+
     panel.grid.major.y = element_line(
       colour = "grey85",
       linewidth = 0.3
     ),
-    
+
     panel.grid.minor.y = element_blank(),
-    
+
     axis.title.x = element_blank(),
-    
+
     axis.text.y = element_text(
       size = 8
     ),
-    
+
     axis.title.y = element_text(
       size = 11
     ),
-    
+
     # The species legend is displayed only
     # beside the Medium-count row.
-    
+
     legend.position = "none",
-    
+
     # Keep health-zone panels close together.
-    
+
     panel.spacing.x = grid::unit(
       0.05,
       "lines"
@@ -2566,8 +2559,8 @@ p_low_count
 
 final_count_plot <-
   (p_high_count /
-     p_medium_count /
-     p_low_count) +
+    p_medium_count /
+    p_low_count) +
   plot_annotation(
     title = expression(
       "Spatial and temporal variation in " *
@@ -2711,7 +2704,7 @@ p_selected_health_zones <- kc_taxon_summary |>
     width = 0.75
   ) +
   facet_wrap(
-    ~ health_zone,
+    ~health_zone,
     ncol = 2,
     scales = "free_y"
   ) +
@@ -2767,68 +2760,67 @@ p_selected_health_zones <- kc_taxon_summary |>
   ) +
   theme_bw() +
   theme(
-    
     # Centre the title and subtitle.
-    
+
     plot.title = element_text(
       hjust = 0.5
     ),
-    
+
     plot.subtitle = element_text(
       hjust = 0.5,
       size = 10
     ),
-    
+
     # Format the health-zone panel labels.
-    
+
     strip.background = element_rect(
       fill = "grey90",
       colour = "black"
     ),
-    
+
     strip.text = element_text(
       face = "bold",
       size = 10
     ),
-    
+
     # Display collection-month labels vertically
     # to improve readability.
-    
+
     axis.text.x = element_text(
       angle = 90,
       hjust = 1,
       vjust = 0.5,
       size = 7
     ),
-    
+
     # Simplify the panel grid.
-    
+
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    
+
     panel.grid.major.y = element_line(
       colour = "grey85",
       linewidth = 0.3
     ),
-    
+
     panel.grid.minor.y = element_blank(),
-    
+
     # Format the species legend.
-    
+
     legend.position = "right",
-    
+
     legend.title = element_text(
       size = 12
     ),
-    
+
     legend.text = element_text(
       size = 10
     ),
-    
+
     # Centre the sampling-design note below the figure.
-    
+
     plot.caption.position = "plot",
-    
+
     plot.caption = element_text(
       hjust = 0.5,
       size = 9,
@@ -2861,7 +2853,6 @@ ggsave(
   dpi = 600,
   bg = "white"
 )
-
 
 
 # 44. Visualise monthly Anopheles species counts in selected health zones -----
@@ -2928,42 +2919,42 @@ p_selected_health_zones <- kc_taxon_summary |>
       fill = identification_taxon
     )
   ) +
-  
+
   # Add vertical separators between consecutive collection months.
-  
+
   geom_vline(
     xintercept = separator_positions,
     colour = "grey70",
     linewidth = 0.35
   ) +
-  
+
   # Display monthly species counts as stacked bars.
-  
+
   geom_col(
     position = "stack",
     width = 0.75
   ) +
-  
+
   # Display the three representative health zones horizontally.
   #
   # Free y-axis scales allow the species-composition patterns
   # to remain visible despite large differences in mosquito count.
-  
+
   facet_wrap(
-    ~ health_zone,
+    ~health_zone,
     ncol = 3,
     scales = "free_y"
   ) +
-  
+
   # Use shorter collection-month labels.
-  
+
   scale_x_discrete(
     labels = month_labels,
     drop = FALSE
   ) +
-  
+
   # Apply consistent species colours and italicised taxon names.
-  
+
   scale_fill_manual(
     limits = poster_taxon_order,
     breaks = poster_taxon_order,
@@ -2990,14 +2981,14 @@ p_selected_health_zones <- kc_taxon_summary |>
       )
     )
   ) +
-  
+
   labs(
     title = expression(
       "Contrasting monthly " *
         italic("Anopheles") *
         " species patterns"
     ),
-    
+
     subtitle = expression(
       "Mutoto: " *
         italic("An. gambiae") *
@@ -3005,87 +2996,86 @@ p_selected_health_zones <- kc_taxon_summary |>
         italic("An. funestus") *
         " gp dominance;   Bobozo: secondary vector species dominance"
     ),
-    
+
     x = "Collection month",
     y = "Mosquito count",
-    
+
     fill = expression(
       italic("Anopheles") ~ "species"
     ),
-    
+
     caption = paste0(
       "Counts are based on 25 fixed households sampled in one village per health zone ",
       "during each collection month."
     )
   ) +
-  
+
   theme_bw() +
-  
+
   theme(
-    
     # Centre the title and subtitle.
-    
+
     plot.title = element_text(
       hjust = 0.5,
       size = 15
     ),
-    
+
     plot.subtitle = element_text(
       hjust = 0.5,
       size = 10
     ),
-    
+
     # Format the health-zone panel labels.
-    
+
     strip.background = element_rect(
       fill = "grey90",
       colour = "black"
     ),
-    
+
     strip.text = element_text(
       face = "bold",
       size = 11
     ),
-    
+
     # Display collection-month labels vertically
     # so that all 12 months remain readable.
-    
+
     axis.text.x = element_text(
       angle = 90,
       hjust = 1,
       vjust = 0.5,
       size = 7
     ),
-    
+
     # Simplify the panel grid.
-    
+
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    
+
     panel.grid.major.y = element_line(
       colour = "grey85",
       linewidth = 0.3
     ),
-    
+
     panel.grid.minor.y = element_blank(),
-    
+
     # Place the species legend below the three panels
     # to preserve horizontal space for the bar charts.
-    
+
     legend.position = "bottom",
-    
+
     legend.title = element_text(
       size = 11
     ),
-    
+
     legend.text = element_text(
       size = 9
     ),
-    
+
     # Format the sampling-design note.
-    
+
     plot.caption.position = "plot",
-    
+
     plot.caption = element_text(
       hjust = 0.5,
       size = 8,
@@ -3095,10 +3085,10 @@ p_selected_health_zones <- kc_taxon_summary |>
       )
     )
   ) +
-  
+
   # Arrange the six identified taxa over two rows
   # to keep the poster legend compact.
-  
+
   guides(
     fill = guide_legend(
       nrow = 2,
@@ -3176,7 +3166,6 @@ names(
 # - validation against health-zone boundaries;
 # - environmental covariate extraction; and
 # - species distribution modelling.
-
 
 # 46. Summarise Anopheles counts for each sampled household --------------------
 
@@ -3294,7 +3283,6 @@ coordinate_range <- kc_df |>
 coordinate_range
 
 
-
 # 49. Convert household coordinates to an sf spatial object
 
 # Convert the household dataset from a regular data frame
@@ -3341,7 +3329,6 @@ nrow(
 )
 
 
-
 # 50. Visualise the spatial distribution of sampled households
 
 # Create an initial spatial quality-control map of the
@@ -3352,19 +3339,19 @@ nrow(
 # health-zone boundaries.
 
 p_household_locations <- ggplot() +
-  
+
   geom_sf(
     data = kc_sf,
     size = 1
   ) +
-  
+
   labs(
     title = "Spatial distribution of sampled households in Kasaï-Central",
     subtitle = "650 fixed households sampled across 26 health zones"
   ) +
-  
+
   theme_bw() +
-  
+
   theme(
     plot.title = element_text(
       hjust = 0.5
@@ -3378,7 +3365,6 @@ p_household_locations <- ggplot() +
 # Display the household location map.
 
 p_household_locations
-
 
 
 # 51. Load the Kasaï-Central health-zone boundaries
@@ -3509,30 +3495,30 @@ n_distinct(
 # across the 26 health zones before spatial validation.
 
 p_households_health_zones <- ggplot() +
-  
+
   # Display the 26 Kasaï-Central health-zone boundaries.
-  
+
   geom_sf(
     data = kc_hz,
     fill = "grey98",
     colour = "grey70",
     linewidth = 0.4
   ) +
-  
+
   # Add the 650 sampled household locations.
-  
+
   geom_sf(
     data = kc_sf,
     size = 1
   ) +
-  
+
   labs(
     title = "Spatial distribution of sampled households across Kasaï-Central health zones",
     subtitle = "650 fixed households sampled across 26 health zones"
   ) +
-  
+
   theme_bw() +
-  
+
   theme(
     plot.title = element_text(
       hjust = 0.5
@@ -3546,7 +3532,6 @@ p_households_health_zones <- ggplot() +
 # Display the household and health-zone map.
 
 p_households_health_zones
-
 
 
 # 55. Validate household locations against their recorded health zones
@@ -3566,8 +3551,7 @@ household_zone_check <- kc_sf |>
     join = st_within
   ) |>
   mutate(
-    health_zone_match =
-      health_zone == spatial_health_zone
+    health_zone_match = health_zone == spatial_health_zone
   )
 
 
@@ -3600,7 +3584,6 @@ spatial_validation <- household_zone_check |>
 # Display the spatial validation results.
 
 spatial_validation
-
 
 
 # 56. Create the PAMCA key map of representative vector-composition patterns
@@ -3672,18 +3655,18 @@ map_width <- as.numeric(
 # Create the PAMCA key map.
 
 p_pamca_key_map <- ggplot() +
-  
+
   # Display all Kasaï-Central health zones.
-  
+
   geom_sf(
     data = pamca_hz_map,
     fill = "grey97",
     colour = "grey75",
     linewidth = 0.25
   ) +
-  
+
   # Highlight Mutoto, Kananga, and Bobozo.
-  
+
   geom_sf(
     data = pamca_hz_map |>
       filter(
@@ -3695,18 +3678,18 @@ p_pamca_key_map <- ggplot() +
     colour = "black",
     linewidth = 0.7
   ) +
-  
+
   # Draw the external boundary of Kasaï-Central.
-  
+
   geom_sf(
     data = kc_outline,
     fill = NA,
     colour = "grey35",
     linewidth = 0.45
   ) +
-  
+
   # Label the three representative health zones.
-  
+
   geom_sf_text(
     data = pamca_hz_map |>
       filter(
@@ -3719,9 +3702,9 @@ p_pamca_key_map <- ggplot() +
     size = 3.2,
     colour = "black"
   ) +
-  
+
   # Apply colours corresponding to the representative patterns.
-  
+
   scale_fill_manual(
     values = pamca_pattern_colors,
     breaks = c(
@@ -3733,37 +3716,39 @@ p_pamca_key_map <- ggplot() +
       italic("An. gambiae") ~ "s.l. dominance",
       italic("An. funestus") ~ "gp dominance",
       "Secondary vector species dominance (" *
-        italic("An. paludis") * ", " *
-        italic("An. hancocki") * ", " *
-        italic("An. moucheti") * ")"
+        italic("An. paludis") *
+        ", " *
+        italic("An. hancocki") *
+        ", " *
+        italic("An. moucheti") *
+        ")"
     )
   ) +
-  
+
   # Keep the map closely fitted to Kasaï-Central.
-  
+
   coord_sf(
     expand = FALSE,
     datum = NA
   ) +
-  
+
   labs(
     title = "Representative vector-composition patterns",
     fill = NULL
   ) +
-  
+
   guides(
     fill = guide_legend(
       nrow = 1,
       byrow = TRUE
     )
   ) +
-  
+
   theme_void() +
-  
+
   theme(
-    
     # Format the map title.
-    
+
     plot.title = element_text(
       hjust = 0.5,
       face = "bold",
@@ -3772,40 +3757,40 @@ p_pamca_key_map <- ggplot() +
         b = 5
       )
     ),
-    
+
     # Position the legend below the map.
-    
+
     legend.position = "bottom",
     legend.justification = "center",
     legend.direction = "horizontal",
-    
+
     # Keep the legend compact and readable.
-    
+
     legend.background = element_blank(),
-    
+
     legend.text = element_text(
       size = 8
     ),
-    
+
     legend.key.width = grid::unit(
       0.42,
       "cm"
     ),
-    
+
     legend.key.height = grid::unit(
       0.42,
       "cm"
     ),
-    
+
     legend.spacing.x = grid::unit(
       0.15,
       "cm"
     ),
-    
+
     legend.margin = margin(
       t = 4
     ),
-    
+
     plot.margin = margin(
       5,
       5,
@@ -3845,7 +3830,6 @@ ggsave(
 # 2. kc_species:
 #    contains the individual mosquitoes identified during those
 #    household collection events.
-
 
 # Prepare the cleaned species-identification dataset.
 #
@@ -3911,11 +3895,6 @@ nrow(
 )
 
 
-
-
-
-
-
 #### For PAMCA
 
 # Create the Mikalayi health-zone layer.
@@ -3949,18 +3928,18 @@ mikalayi_sentinel_site <- kc_location |>
 # Create the DRC study-location map.
 
 p_drc_kc_key_map <- ggplot() +
-  
+
   # Display all DRC provinces in white.
-  
+
   geom_sf(
     data = drc_provinces,
     fill = "white",
     colour = "grey65",
     linewidth = 0.25
   ) +
-  
+
   # Highlight Kasaï-Central Province in grey.
-  
+
   geom_sf(
     data = drc_provinces |>
       filter(
@@ -3972,12 +3951,12 @@ p_drc_kc_key_map <- ggplot() +
     colour = "black",
     linewidth = 0.45
   ) +
-  
+
   # Highlight Mikalayi health zone in blue.
   #
   # A thinner boundary is used so that the sentinel-site point
   # remains clearly visible even when it is close to the edge.
-  
+
   geom_sf(
     data = mikalayi_hz,
     aes(
@@ -3986,10 +3965,10 @@ p_drc_kc_key_map <- ggplot() +
     colour = "black",
     linewidth = 0.30
   ) +
-  
+
   # Add the Mikalayi sentinel site using the mean GPS
   # coordinates of surveyed households in Mikalayi.
-  
+
   geom_sf(
     data = mikalayi_sentinel_site,
     aes(
@@ -3998,9 +3977,9 @@ p_drc_kc_key_map <- ggplot() +
     size = 1.8,
     colour = "black"
   ) +
-  
+
   # Define colours for Kasaï-Central and Mikalayi.
-  
+
   scale_fill_manual(
     values = c(
       "Kasaï-Central Province" = "grey65",
@@ -4011,25 +3990,25 @@ p_drc_kc_key_map <- ggplot() +
       "Mikalayi health zone"
     )
   ) +
-  
+
   # Define the symbol for the Mikalayi sentinel site.
-  
+
   scale_shape_manual(
     values = c(
       "Mikalayi sentinel site" = 19
     )
   ) +
-  
+
   coord_sf(
     expand = FALSE,
     datum = NA
   ) +
-  
+
   labs(
     fill = NULL,
     shape = NULL
   ) +
-  
+
   guides(
     fill = guide_legend(
       order = 1
@@ -4038,28 +4017,28 @@ p_drc_kc_key_map <- ggplot() +
       order = 2
     )
   ) +
-  
+
   theme_void() +
-  
+
   theme(
     legend.position = "bottom",
     legend.justification = "center",
     legend.direction = "horizontal",
-    
+
     legend.text = element_text(
       size = 9
     ),
-    
+
     legend.key.width = grid::unit(
       0.45,
       "cm"
     ),
-    
+
     legend.key.height = grid::unit(
       0.45,
       "cm"
     ),
-    
+
     plot.margin = margin(
       5,
       5,
