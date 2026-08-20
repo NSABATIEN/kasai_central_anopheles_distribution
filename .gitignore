@@ -7,7 +7,7 @@ data/
 *.csv
 *.xls
 *.xlsx
-/output
+/outputs
 kc_plots_files
 *.tif
 *.DS_Store
