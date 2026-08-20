@@ -17,6 +17,7 @@ library(dplyr)
 library(forcats)
 library(lubridate)
 library(ggh4x)
+library(sf) # invoked in read_in_kc_data.R
 
 # set the data path for geodata
-options( geodata_default_path = "data/raw")
+options(geodata_default_path = "data/raw")
