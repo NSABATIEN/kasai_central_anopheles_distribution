@@ -3818,6 +3818,22 @@ ggsave(
   bg = "white"
 )
 
+# 58. Save household location data for subsequent spatial analyses -------------
+
+# Save the household location dataset imported from the
+# "location" worksheet of the Kasaï-Central entomological database.
+
+write_csv(
+  kc_location,
+  "data/clean/kc_household_coords.csv"
+)
+
+# Confirm that the household-coordinate dataset was saved successfully.
+
+file.exists(
+  "data/clean/kc_household_coords.csv"
+)
+
 
 # 59. Save cleaned entomological datasets for count-data preparation
 
