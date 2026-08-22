@@ -121,7 +121,7 @@ excel_sheets(latest_file)
 # - data: household mosquito collection records;
 # - species: individual mosquito identification records; and
 # - location: household geographic coordinates.
-#
+# - time :  sampling effort of each collector spent collecting mosquitoes
 # clean_names() standardises variable names to lower case and replaces
 # spaces and special characters with underscores.
 
