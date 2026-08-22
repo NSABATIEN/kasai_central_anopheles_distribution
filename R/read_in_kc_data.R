@@ -1674,7 +1674,7 @@ plot_species_count_hz
 
 # 28. Save the health-zone species count plot in high resolution ---------------
 
-# Create the figure output directory if it does not already exist.
+# Create the figure outputs directory if it does not already exist.
 #
 # recursive = TRUE creates any missing parent folders.
 # showWarnings = FALSE avoids a warning when the folder already exists.
