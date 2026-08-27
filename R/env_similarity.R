@@ -270,13 +270,6 @@ global(
 )
 
 
-# Visually inspect the spatial distribution of MESS values
-# across Kasaï-Central.
-
-plot(
-  kc_mess
-)
-
 # 11. Mask the MESS surface to the Kasaï-Central boundary
 
 # Load the health-zone boundaries for Kasaï-Central.
@@ -303,13 +296,6 @@ kc_boundary <- st_union(
 kc_mess <- mask(
   kc_mess,
   vect(kc_boundary)
-)
-
-
-# Visually inspect the masked MESS surface.
-
-plot(
-  kc_mess
 )
 
 
@@ -1186,3 +1172,74 @@ plot_drc_mess_provinces_households
 #   bg = "transparent"
 # )
 # 
+
+# 32. MESS: add values with large impacts
+
+# Check the Kasaï-Central mask
+kc_mask_raster
+
+plot(kc_mask_raster)
+
+# Generate random points across Kasaï-Central
+set.seed(123)
+
+kc_random <- terra::spatSample(
+  kc_mask_raster,
+  size = 5000,
+  method = "random",
+  na.rm = TRUE,
+  as.points = TRUE
+)
+
+kc_random
+
+nrow(kc_random)
+
+# Extract environmental values at random locations
+kc_random_env <- terra::extract(
+  kc_env,
+  kc_random,
+  ID = FALSE
+)
+
+head(kc_random_env)
+
+dim(kc_random_env)
+
+# Plot environmental space
+plot_environmental_space <- ggplot(kc_random_env) +
+  geom_point(
+    aes(
+      x = annual_precipitation,
+      y = tree_cover
+    ),
+    colour = "grey75",
+    size = 0.5,
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = kc_sample_cell,
+    aes(
+      x = annual_precipitation,
+      y = tree_cover
+    ),
+    colour = "firebrick",
+    size = 2
+  ) +
+  labs(
+    x = "Annual precipitation (mm)",
+    y = "Tree cover proportion"
+  ) +
+  theme_classic()
+
+# Combine MESS map and environmental-space plot
+plot_mess_environment <- plot_kc_mess_province_households +
+  plot_environmental_space +
+  patchwork::plot_layout(
+    widths = c(1, 1)
+  ) +
+  patchwork::plot_annotation(
+    tag_levels = "A"
+  )
+
+plot_mess_environment
