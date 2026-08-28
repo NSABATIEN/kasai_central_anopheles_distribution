@@ -430,9 +430,9 @@ p_drc_kc_key_map
 ggsave(
   filename = "outputs/figures/drc_kasai_central_mikalayi_location_map.png",
   plot = p_drc_kc_key_map,
-  width = 8,
-  height = 8,
+  width = 4.29,
+  height = 4.13,
   units = "in",
-  dpi = 600,
+  dpi = 300,
   bg = "white"
 )
