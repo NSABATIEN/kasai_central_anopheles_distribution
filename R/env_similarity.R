@@ -1440,10 +1440,10 @@ plot_environmental_space
 ggsave(
   filename = "outputs/figures/kc_mess_map.png",
   plot = plot_kc_mess_province_households,
-  width = 8,
-  height = 7,
+  width = 9,
+  height = 10.85,
   units = "in",
-  dpi = 600,
+  dpi = 300,
   bg = "white"
 )
 
@@ -1453,9 +1453,9 @@ ggsave(
 ggsave(
   filename = "outputs/figures/kc_environmental_space.png",
   plot = plot_environmental_space,
-  width = 8,
-  height = 7,
+  width = 11.81,
+  height = 10.34,
   units = "in",
-  dpi = 600,
+  dpi = 300,
   bg = "white"
 )
