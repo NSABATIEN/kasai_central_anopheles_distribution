@@ -7,6 +7,7 @@
 # - Kananga: An. funestus gp dominance; and
 # - Bobozo: secondary vector species dominance.
 
+
 pamca_map_key <- tibble(
   health_zone = c(
     "Mutoto",
