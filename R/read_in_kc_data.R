@@ -73,9 +73,6 @@ pamca_hz_labels <- kc_hz |>
 p_pamca_key_map <- ggplot() +
   
   # Display all 26 Kasaï-Central health zones.
-  #
-  # Internal health-zone boundaries are slightly highlighted
-  # to make the spatial structure of the province visible.
   
   geom_sf(
     data = kc_hz,
@@ -101,42 +98,14 @@ p_pamca_key_map <- ggplot() +
     aes(
       colour = selected_pattern
     ),
-    size = 2
-  ) +
-  
-  # Label the three representative health zones.
-  
-  geom_sf_text(
-    data = pamca_hz_labels,
-    aes(
-      label = health_zone
-    ),
-    fontface = "bold",
-    size = 3.2,
-    colour = "black"
+    size = 6
   ) +
   
   # Apply colours corresponding to the representative
   # vector-composition patterns.
   
   scale_colour_manual(
-    values = pamca_pattern_colors,
-    breaks = c(
-      "An. gambiae s.l. dominance",
-      "An. funestus gp dominance",
-      "Secondary vector species dominance"
-    ),
-    labels = expression(
-      italic("An. gambiae") ~ "s.l. dominance",
-      italic("An. funestus") ~ "gp dominance",
-      "Secondary vector species dominance (" *
-        italic("An. paludis") *
-        ", " *
-        italic("An. hancocki") *
-        ", " *
-        italic("An. moucheti") *
-        ")"
-    )
+    values = pamca_pattern_colors
   ) +
   
   # Keep the map closely fitted to Kasaï-Central.
@@ -146,69 +115,12 @@ p_pamca_key_map <- ggplot() +
     datum = NA
   ) +
   
-  labs(
-    title = "Representative vector-composition patterns",
-    colour = NULL
-  ) +
-  
-  guides(
-    colour = guide_legend(
-      nrow = 1,
-      byrow = TRUE,
-      override.aes = list(
-        size = 4
-      )
-    )
-  ) +
+  # Remove axes, title, and legend.
   
   theme_void() +
   
   theme(
-    
-    # Format the map title.
-    
-    plot.title = element_text(
-      hjust = 0.5,
-      face = "bold",
-      size = 15,
-      margin = margin(
-        b = 5
-      )
-    ),
-    
-    # Position the legend below the map.
-    
-    legend.position = "bottom",
-    legend.justification = "center",
-    legend.direction = "horizontal",
-    
-    # Keep the legend compact and readable.
-    
-    legend.background = element_blank(),
-    
-    legend.text = element_text(
-      size = 8
-    ),
-    
-    legend.key.width = grid::unit(
-      0.5,
-      "cm"
-    ),
-    
-    legend.key.height = grid::unit(
-      0.5,
-      "cm"
-    ),
-    
-    legend.spacing.x = grid::unit(
-      0.15,
-      "cm"
-    ),
-    
-    legend.margin = margin(
-      t = 4
-    ),
-    
+    legend.position = "none",
     plot.margin = margin(
       5,
       5,
@@ -222,7 +134,6 @@ p_pamca_key_map <- ggplot() +
 
 p_pamca_key_map
 
-
 # 57. Save the PAMCA key map in high resolution -------------------------------
 
 # Save the PAMCA key map as a high-resolution PNG.
@@ -230,10 +141,10 @@ p_pamca_key_map
 ggsave(
   filename = "outputs/figures/pamca_representative_vector_patterns_map.png",
   plot = p_pamca_key_map,
-  width = 8,
-  height = 10.5,
+  width = 5.14,
+  height = 6.74,
   units = "in",
-  dpi = 600,
+  dpi = 300,
   bg = "white"
 )
 
