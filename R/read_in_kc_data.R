@@ -2920,25 +2920,16 @@ p_selected_health_zones <- kc_taxon_summary |>
     )
   ) +
   
-  # Add vertical separators between consecutive collection months.
-  
   geom_vline(
     xintercept = separator_positions,
     colour = "grey70",
     linewidth = 0.35
   ) +
   
-  # Display monthly species counts as stacked bars.
-  
   geom_col(
     position = "stack",
     width = 0.75
   ) +
-  
-  # Display the three representative health zones horizontally.
-  #
-  # Free y-axis scales allow the species-composition patterns
-  # to remain visible despite large differences in mosquito count.
   
   facet_wrap(
     ~health_zone,
@@ -2946,14 +2937,10 @@ p_selected_health_zones <- kc_taxon_summary |>
     scales = "free_y"
   ) +
   
-  # Use shorter collection-month labels.
-  
   scale_x_discrete(
     labels = month_labels,
     drop = FALSE
   ) +
-  
-  # Apply consistent species colours and italicised taxon names.
   
   scale_fill_manual(
     limits = poster_taxon_order,
@@ -2994,7 +2981,7 @@ p_selected_health_zones <- kc_taxon_summary |>
         italic("An. gambiae") *
         " s.l. dominance;   Kananga: " *
         italic("An. funestus") *
-        " gp dominance;   Bobozo: secondary vector species dominance"
+        " gp dominance;   Bobozo: greater contribution of secondary vector species"
     ),
     
     x = "Collection month",
@@ -3013,41 +3000,51 @@ p_selected_health_zones <- kc_taxon_summary |>
   theme_bw() +
   
   theme(
-    # Centre the title and subtitle.
-    
     plot.title = element_text(
       hjust = 0.5,
-      size = 15
+      size = 22,
+      face = "bold"
     ),
     
     plot.subtitle = element_text(
       hjust = 0.5,
-      size = 10
+      size = 17,
+      margin = margin(
+        b = 8
+      )
     ),
     
-    # Format the health-zone panel labels.
-    
-    strip.background = element_rect(
-      fill = "grey90",
-      colour = "black"
+    axis.title.x = element_text(
+      size = 17,
+      face = "bold"
     ),
     
-    strip.text = element_text(
-      face = "bold",
-      size = 11
+    axis.title.y = element_text(
+      size = 17,
+      face = "bold"
     ),
-    
-    # Display collection-month labels vertically
-    # so that all 12 months remain readable.
     
     axis.text.x = element_text(
       angle = 90,
       hjust = 1,
       vjust = 0.5,
-      size = 7
+      size = 14
     ),
     
-    # Simplify the panel grid.
+    axis.text.y = element_text(
+      size = 14
+    ),
+    
+    strip.background = element_rect(
+      fill = "grey90",
+      colour = "black",
+      linewidth = 0.5
+    ),
+    
+    strip.text = element_text(
+      face = "bold",
+      size = 17
+    ),
     
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
@@ -3059,35 +3056,27 @@ p_selected_health_zones <- kc_taxon_summary |>
     
     panel.grid.minor.y = element_blank(),
     
-    # Place the species legend below the three panels
-    # to preserve horizontal space for the bar charts.
-    
     legend.position = "bottom",
     
     legend.title = element_text(
-      size = 11
+      size = 16
     ),
     
     legend.text = element_text(
-      size = 9
+      size = 14
     ),
-    
-    # Format the sampling-design note.
     
     plot.caption.position = "plot",
     
     plot.caption = element_text(
       hjust = 0.5,
-      size = 8,
+      size = 12,
       face = "italic",
       margin = margin(
-        t = 8
+        t = 12
       )
     )
   ) +
-  
-  # Arrange the six identified taxa over two rows
-  # to keep the poster legend compact.
   
   guides(
     fill = guide_legend(
@@ -3096,8 +3085,6 @@ p_selected_health_zones <- kc_taxon_summary |>
     )
   )
 
-
-# Display the selected health-zone figure.
 
 p_selected_health_zones
 
@@ -3112,10 +3099,10 @@ p_selected_health_zones
 ggsave(
   filename = "outputs/figures/pamca_selected_health_zones_species_counts.png",
   plot = p_selected_health_zones,
-  width = 16,
-  height = 7,
+  width = 23.43,
+  height = 9.43,
   units = "in",
-  dpi = 600,
+  dpi = 300,
   bg = "white"
 )
 
