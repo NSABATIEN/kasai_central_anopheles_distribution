@@ -1173,14 +1173,88 @@ plot_drc_mess_provinces_households
 # )
 # 
 
-# 32. MESS: add values with large impacts
+# 32. Environmental space for high-impact covariates ---------------------------
 
-# Check the Kasaï-Central mask
+
+# Load the original environmental covariates for Kasaï-Central.
+
+bioclim_crop <- terra::rast(
+  "data/clean/bioclim_crop.tif"
+)
+
+landcover_crop <- terra::rast(
+  "data/clean/landcover_crop.tif"
+)
+
+
+# Check layer names.
+
+names(
+  bioclim_crop
+)
+
+names(
+  landcover_crop
+)
+
+
+# Select annual precipitation (BIO12).
+
+annual_precipitation <- bioclim_crop[["bio_12"]]
+
+
+# Identify the tree-cover layer.
+
+tree_layer_name <- grep(
+  "trees",
+  names(landcover_crop),
+  ignore.case = TRUE,
+  value = TRUE
+)
+
+tree_layer_name
+
+
+# Select tree cover.
+
+tree_cover <- landcover_crop[[tree_layer_name[1]]]
+
+
+# Combine annual precipitation and tree cover.
+
+kc_env <- c(
+  annual_precipitation,
+  tree_cover
+)
+
+names(kc_env) <- c(
+  "annual_precipitation",
+  "tree_cover"
+)
+
+
+# Create a raster mask representing environmental conditions
+# across Kasaï-Central.
+
+kc_mask_raster <- terra::ifel(
+  !is.na(kc_env[[1]]) &
+    !is.na(kc_env[[2]]),
+  1,
+  NA
+)
+
+
+# Check the Kasaï-Central mask.
+
 kc_mask_raster
 
-plot(kc_mask_raster)
+plot(
+  kc_mask_raster
+)
 
-# Generate random points across Kasaï-Central
+
+# Generate 5,000 random background locations across Kasaï-Central.
+
 set.seed(123)
 
 kc_random <- terra::spatSample(
@@ -1191,55 +1265,197 @@ kc_random <- terra::spatSample(
   as.points = TRUE
 )
 
+
+# Check the random locations.
+
 kc_random
 
-nrow(kc_random)
+nrow(
+  kc_random
+)
 
-# Extract environmental values at random locations
+
+# Extract environmental values at random background locations.
+
 kc_random_env <- terra::extract(
   kc_env,
   kc_random,
   ID = FALSE
 )
 
-head(kc_random_env)
 
-dim(kc_random_env)
+# Check the extracted environmental values.
 
-# Plot environmental space
-plot_environmental_space <- ggplot(kc_random_env) +
+head(
+  kc_random_env
+)
+
+dim(
+  kc_random_env
+)
+
+
+# Prepare surveyed household coordinates as a numeric matrix.
+
+household_xy <- household_covariates |>
+  dplyr::select(
+    long_dd,
+    lat_dd
+  ) |>
+  dplyr::filter(
+    !is.na(long_dd),
+    !is.na(lat_dd)
+  ) |>
+  as.matrix()
+
+
+# Check the coordinate matrix.
+
+head(
+  household_xy
+)
+
+dim(
+  household_xy
+)
+
+
+# Identify raster cells containing surveyed households.
+
+survey_cells <- terra::cellFromXY(
+  kc_env[[1]],
+  household_xy
+)
+
+
+# Retain unique valid raster cells.
+
+survey_cells <- unique(
+  survey_cells[
+    !is.na(survey_cells)
+  ]
+)
+
+
+# Check the number of unique environmental cells represented
+# by the household survey.
+
+length(
+  survey_cells
+)
+
+
+# Extract environmental values from surveyed raster cells.
+
+kc_sample_cell <- as.data.frame(
+  kc_env,
+  cells = TRUE,
+  na.rm = TRUE
+) |>
+  dplyr::filter(
+    cell %in% survey_cells
+  ) |>
+  dplyr::select(
+    annual_precipitation,
+    tree_cover
+  )
+
+
+# Check surveyed environmental conditions.
+
+head(
+  kc_sample_cell
+)
+
+nrow(
+  kc_sample_cell
+)
+
+
+# Create the environmental-space figure.
+
+plot_environmental_space <- ggplot() +
+  
+  # Environmental background across Kasaï-Central.
   geom_point(
+    data = kc_random_env,
     aes(
       x = annual_precipitation,
-      y = tree_cover
+      y = tree_cover,
+      colour = "Environmental conditions"
     ),
-    colour = "grey75",
     size = 0.5,
-    alpha = 0.5
+    alpha = 0.25
   ) +
+  
+  # Environmental conditions at surveyed households.
   geom_point(
     data = kc_sample_cell,
     aes(
       x = annual_precipitation,
-      y = tree_cover
+      y = tree_cover,
+      colour = "Surveyed households"
     ),
-    colour = "firebrick",
     size = 2
   ) +
+  
+  # Define legend colours.
+  scale_colour_manual(
+    values = c(
+      "Environmental conditions" = "firebrick",
+      "Surveyed households" = "black"
+    )
+  ) +
+  
+  # Improve legend appearance.
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = c(4, 4),
+        alpha = c(1, 1)
+      )
+    )
+  ) +
+  
   labs(
     x = "Annual precipitation (mm)",
-    y = "Tree cover proportion"
+    y = "Tree cover proportion",
+    colour = NULL
   ) +
-  theme_classic()
-
-# Combine MESS map and environmental-space plot
-plot_mess_environment <- plot_kc_mess_province_households +
-  plot_environmental_space +
-  patchwork::plot_layout(
-    widths = c(1, 1)
-  ) +
-  patchwork::plot_annotation(
-    tag_levels = "A"
+  
+  theme_classic() +
+  
+  theme(
+    legend.position = "top",
+    legend.text = element_text(
+      size = 10
+    )
   )
 
-plot_mess_environment
+plot_environmental_space
+
+
+# Save Figure 1: MESS map.
+
+ggsave(
+  filename = "outputs/figures/kc_mess_map.png",
+  plot = plot_kc_mess_province_households,
+  width = 8,
+  height = 7,
+  units = "in",
+  dpi = 600,
+  bg = "white"
+)
+
+
+# Save Figure 2: environmental-space plot.
+
+ggsave(
+  filename = "outputs/figures/kc_environmental_space.png",
+  plot = plot_environmental_space,
+  width = 8,
+  height = 7,
+  units = "in",
+  dpi = 600,
+  bg = "white"
+)

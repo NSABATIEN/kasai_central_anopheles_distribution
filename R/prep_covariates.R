@@ -1440,3 +1440,111 @@ for (i in seq_len(n_landcover_pcs_keep)) {
 par(
   mfrow = c(1, 1)
 )
+
+
+# 27. Extract environmental covariates at household locations
+
+# Extract the final environmental predictor values from the
+# Kasaï-Central raster stack at each sampled household location.
+#
+# Each row represents one household location and each column
+# represents one environmental predictor.
+
+coord_covs <- terra::extract(
+  covariates_crop,
+  select(
+    coords,
+    long_dd,
+    lat_dd
+  ),
+  ID = FALSE
+)
+
+
+# Confirm that environmental predictors were extracted for
+# the expected 650 household locations.
+
+dim(
+  coord_covs
+)
+
+
+# Check the environmental predictor names.
+#
+# We expect:
+# - 4 bioclimatic principal components; and
+# - 5 land-cover principal components.
+
+names(
+  coord_covs
+)
+
+
+# Check for missing environmental predictor values.
+
+sum(
+  is.na(coord_covs)
+)
+
+
+# Inspect the first few extracted records.
+
+head(
+  coord_covs
+)
+
+
+# 28. Combine household information and environmental covariates
+
+# Combine the household identifiers and geographic coordinates
+# with their corresponding environmental predictor values.
+#
+# The row order is preserved because the environmental values
+# were extracted directly using the coordinates in coords.
+
+coords_covariates <- bind_cols(
+  coords,
+  coord_covs
+)
+
+
+# Confirm the dimensions of the final household
+# environmental covariate dataset.
+
+dim(
+  coords_covariates
+)
+
+
+# Check the variable names.
+
+names(
+  coords_covariates
+)
+
+
+# Inspect the first few records.
+
+head(
+  coords_covariates
+)
+
+
+# 29. Save household environmental covariates
+
+# Save the final household-level environmental covariate dataset.
+#
+# This file will be used later to join the environmental predictors
+# to the repeated mosquito count observations during model preparation.
+
+write_csv(
+  coords_covariates,
+  "data/clean/coords_covariates.csv"
+)
+
+
+# Confirm that the file was successfully saved.
+
+file.exists(
+  "data/clean/coords_covariates.csv"
+)
