@@ -26,13 +26,13 @@ count_data |>
   glimpse()
 
 
-# 3. Create household-level Anopheles counts for the full study period
+# 3. Create household-level Anopheles counts by month
 
-# Combine mosquito counts from all collection rounds
-# for each household and Anopheles taxon.
+# Summarise mosquito counts for each household,
+# collection month and Anopheles taxon.
 
 # After this step, each row represents:
-# one household × one Anopheles taxon.
+# one household × one month × one Anopheles taxon.
 
 counts <- count_data |>
   group_by(
@@ -73,8 +73,8 @@ dim(
 )
 
 
-# Confirm that pooling the collection rounds
-# preserved the total number of mosquitoes.
+# Confirm that summarising the household-month-taxon
+# observations preserved the total number of mosquitoes.
 
 sum(
   counts$count
@@ -248,7 +248,43 @@ cell_month_counts |>
     )
   )
 
-names(counts)
+
+# Check how many cell × month × taxon observations
+# have 1, 2, 3, ... contributing households.
+
+cell_month_counts |>
+  count(
+    n_households
+  ) |>
+  arrange(
+    n_households
+  )
+
+
+# Check the number of unique households
+# represented within each raster cell.
+
+counts_coords |>
+  group_by(
+    cell_id
+  ) |>
+  summarise(
+    n_unique_households = n_distinct(
+      health_zone,
+      health_area,
+      village,
+      house_number
+    ),
+    .groups = "drop"
+  ) |>
+  arrange(
+    desc(
+      n_unique_households
+    )
+  )|>
+  print(
+    n = Inf
+  )
 
 # 9. Extract environmental covariates for sampled raster cells
 
