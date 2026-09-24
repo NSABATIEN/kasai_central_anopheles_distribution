@@ -146,6 +146,12 @@ anopheles_hierarchical_gam <- gam(
     s(landcover_pc4, species, bs = "re") +
     s(landcover_pc5, species, bs = "re"),
   
+  # Adjustment for the number of sampled households
+  offset = 
+    log(
+      n_households
+    ),
+  
   # Negative-binomial observation model
   family = nb(),
   
