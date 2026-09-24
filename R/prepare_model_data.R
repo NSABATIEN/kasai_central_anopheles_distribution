@@ -10,7 +10,7 @@ source(
 
 # 2. Load Anopheles count data
 
-# This dataset contains species-specific mosquito counts
+# This dataset contains species mosquito counts
 # recorded for each household sampling event across
 # the 12 collection rounds.
 
@@ -40,6 +40,7 @@ counts <- count_data |>
     health_area,
     village,
     house_number,
+    collection_month,
     identification_taxon
   ) |>
   summarise(
@@ -82,58 +83,35 @@ sum(
 
 # 4. Load household environmental covariates
 
-# These environmental covariates were prepared previously
-# in prep_covariates.R.
+# Coordinates are joined to mosquito counts prior to extracting covariates.
 
-# The dataset contains household identifiers,
-# coordinates and the environmental PCA predictors.
-
-coords_covariates <- read_csv(
-  "data/clean/coords_covariates.csv",
+coords <- read_csv(
+  "data/clean/kc_household_coords.csv",
   show_col_types = FALSE
 )
 
 
-# Inspect the household covariate dataset.
+# Keep household identifiers and coordinates.
 
-coords_covariates |>
-  glimpse()
-
-
-dim(
-  coords_covariates
-)
-
-
-# 5. Retain variables required for modelling and mapping
-
-household_covariates <- coords_covariates |>
+coords <- coords |>
   select(
     health_zone,
     health_area,
     village,
     house_number,
     long_dd,
-    lat_dd,
-    starts_with("bioclim_pc"),
-    starts_with("landcover_pc")
+    lat_dd
   )
 
-
-# Inspect the retained variables.
-
-household_covariates |>
+coords |>
   glimpse()
 
 
-# 6. Combine household counts with environmental covariates
+# 5. Join household coordinates to mosquito counts
 
-# Join the household-level mosquito counts with
-# environmental predictors at the sampled households.
-
-model_data <- counts |>
+counts_coords <- counts |>
   left_join(
-    household_covariates,
+    coords,
     by = c(
       "health_zone",
       "health_area",
@@ -143,25 +121,200 @@ model_data <- counts |>
   )
 
 
-# 7. Check the final modelling dataframe
+counts_coords |>
+  glimpse()
 
-# Each row should represent:
-# one household × one Anopheles taxon.
+
+# Check that all records received coordinates.
+
+counts_coords |>
+  summarise(
+    missing_longitude = sum(
+      is.na(long_dd)
+    ),
+    missing_latitude = sum(
+      is.na(lat_dd)
+    )
+  )
+
+
+# 6. Load environmental covariate raster
+
+# The raster contains the environmental PCA covariates
+# prepared previously in prep_covariates.R.
+
+covs <- rast(
+  "data/clean/covariates.tif"
+)
+
+
+covs
+
+
+names(
+  covs
+)
+
+
+# 7. Attach raster cell ID to each household observation
+
+# cellFromXY() identifies the raster cell containing
+# each sampled household.
+
+counts_coords$cell_id <- terra::cellFromXY(
+  covs,
+  counts_coords |>
+    select(
+      long_dd,
+      lat_dd
+    ) |>
+    as.matrix()
+)
+
+
+# Inspect raster-cell assignment.
+
+counts_coords |>
+  select(
+    health_zone,
+    health_area,
+    village,
+    house_number,
+    collection_month,
+    species,
+    count,
+    cell_id
+  ) |>
+  glimpse()
+
+
+# Check for observations that were not assigned
+# to a raster cell.
+
+sum(
+  is.na(
+    counts_coords$cell_id
+  )
+)
+
+
+# 8. Aggregate mosquito counts by raster cell, month and taxon
+
+# Each row now represents:
+#
+# one raster cell × one month × one Anopheles taxon.
+#
+# n_households records the number of sampled households
+# contributing to the mosquito count in that raster cell.
+
+cell_month_counts <- counts_coords |>
+  group_by(
+    cell_id,
+    collection_month,
+    species
+  ) |>
+  summarise(
+    n_households = n(),
+    count = sum(
+      count,
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  )
+
+
+cell_month_counts |>
+  glimpse()
+
+
+# Check that total mosquito counts are still preserved.
+
+sum(
+  cell_month_counts$count
+)
+
+# Check the sampling effort per cell.
+
+cell_month_counts |>
+  summarise(
+    minimum_households = min(
+      n_households
+    ),
+    maximum_households = max(
+      n_households
+    ),
+    median_households = median(
+      n_households
+    )
+  )
+
+names(counts)
+
+# 9. Extract environmental covariates for sampled raster cells
+
+# Identify the unique raster cells represented
+# in the mosquito observations.
+
+sampled_cells <- sort(
+  unique(
+    cell_month_counts$cell_id
+  )
+)
+
+
+# Extract environmental predictor values
+# for each sampled raster cell.
+
+cell_covariates <- terra::extract(
+  covs,
+  sampled_cells
+) |>
+  as_tibble() |>
+  mutate(
+    cell_id = sampled_cells,
+    .before = 1
+  )
+
+
+# Inspect extracted covariates.
+
+cell_covariates |>
+  glimpse()
+
+
+nrow(
+  cell_covariates
+)
+
+length(
+  sampled_cells
+)
+
+names(
+  cell_covariates
+)
+
+# 10. Join environmental covariates to aggregated mosquito counts
+
+model_data <- cell_month_counts |>
+  left_join(
+    cell_covariates,
+    by = "cell_id"
+  )
+
+
+# 11. Check final modelling dataframe
 
 model_data |>
   glimpse()
 
-
-# Expected:
-# 650 households × 7 taxa = 4,550 observations.
 
 dim(
   model_data
 )
 
 
-# Confirm that all observations received values
-# for the nine environmental PCA predictors.
+# Check for missing environmental covariates.
 
 model_data |>
   summarise(
@@ -170,22 +323,44 @@ model_data |>
         starts_with("bioclim_pc"),
         starts_with("landcover_pc")
       ),
-      ~ sum(is.na(.x))
+      ~ sum(
+        is.na(.x)
+      )
     )
   )
 
 
-# Confirm that joining the environmental covariates
-# did not duplicate or remove mosquito counts.
+# Confirm total mosquito counts are still preserved.
 
 sum(
   model_data$count
 )
 
 
-# 8. Save final modelling dataframe
+# Check number of raster cells represented.
 
-# This dataframe will be loaded directly by fit_model.R.
+n_distinct(
+  model_data$cell_id
+)
+
+
+# Check months represented.
+
+sort(
+  unique(
+    model_data$collection_month
+  )
+)
+
+
+# Check taxon levels.
+
+levels(
+  model_data$species
+)
+
+
+# 12. Save final modelling dataframe
 
 saveRDS(
   model_data,
@@ -193,7 +368,7 @@ saveRDS(
 )
 
 
-# Confirm that the file was saved successfully.
+# Confirm that the file was saved.
 
 file.exists(
   "data/clean/kc_anopheles_model_data.rds"
