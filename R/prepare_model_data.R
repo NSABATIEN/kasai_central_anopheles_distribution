@@ -341,16 +341,82 @@ model_data <- cell_month_counts |>
 
 # 11. Check final modelling dataframe
 
+# Inspect the final modelling dataframe.
+
 model_data |>
   glimpse()
 
+
+# Check the number of rows and columns.
 
 dim(
   model_data
 )
 
 
-# Check for missing environmental covariates.
+# Check variable names.
+
+names(
+  model_data
+)
+
+
+# Confirm that the total mosquito count
+# is still preserved.
+
+sum(
+  model_data$count
+)
+
+
+# Check the number of raster cells represented.
+
+n_distinct(
+  model_data$cell_id
+)
+
+
+# Check collection months represented.
+
+sort(
+  unique(
+    model_data$collection_month
+  )
+)
+
+
+# Check Anopheles taxon levels.
+
+levels(
+  model_data$species
+)
+
+
+# Check sampling effort.
+
+summary(
+  model_data$n_households
+)
+
+
+# Confirm that every modelling observation
+# has at least one contributing household.
+
+sum(
+  model_data$n_households <= 0
+)
+
+
+# Check for missing values in all model variables.
+
+colSums(
+  is.na(
+    model_data
+  )
+)
+
+
+# Check for missing environmental covariates specifically.
 
 model_data |>
   summarise(
@@ -364,36 +430,6 @@ model_data |>
       )
     )
   )
-
-
-# Confirm total mosquito counts are still preserved.
-
-sum(
-  model_data$count
-)
-
-
-# Check number of raster cells represented.
-
-n_distinct(
-  model_data$cell_id
-)
-
-
-# Check months represented.
-
-sort(
-  unique(
-    model_data$collection_month
-  )
-)
-
-
-# Check taxon levels.
-
-levels(
-  model_data$species
-)
 
 
 # 12. Save final modelling dataframe
