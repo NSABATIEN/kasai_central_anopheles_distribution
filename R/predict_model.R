@@ -1,5 +1,5 @@
 
-# SPATIAL PREDICTION OF INDOOR VECTORS SPECIES 
+# SPATIAL PREDICTION OF INDOOR VECTOR SPECIES 
 
 # 1. Load packages
 
@@ -16,9 +16,10 @@ source(
 # It is required here for:
 #
 # - taxon names;
-# - sampled household coordinates;
-# - observed mosquito counts; and
-# - environmental conditions represented at sampled households.
+# - raster cells represented in the sampling data;
+# - collection months;
+# - household sampling effort; and
+# - environmental conditions represented in the model data.
 
 model_data <- readRDS(
   "data/clean/kc_anopheles_model_data.rds"
@@ -56,15 +57,25 @@ summary(
 # 4. Load environmental covariates for spatial prediction
 
 # These raster layers contain the same nine environmental
-# PCA predictors used to fit the GAM.
+# PCA covariates used to fit the GAM.
 
 covs <- rast(
   "data/clean/covariates.tif"
 )
 
+# Inspect the covariate raster.
 
 covs
 
+
+# Confirm the number of covariates layers.
+
+nlyr(
+  covs
+)
+
+
+# Check covariates names.
 
 names(
   covs
@@ -136,10 +147,26 @@ species_layer_ziemanni[] <-
   "An. ziemanni"
 
 
+# Create a sampling-effort layer for prediction.
+
+# Setting n_households = 1 standardises predictions
+# to one sampled household.
+
+n_households_layer <- covs[[1]] * 0 + 1
+
+
+names(
+  n_households_layer
+) <- "n_households"
+
+
 # 6. Generate taxon-specific spatial predictions
 
 # Use the fitted hierarchical GAM to predict
 # Anopheles mosquito counts across Kasaï-Central.
+
+# Predictions are standardised to one household
+# because n_households = 1 in the prediction data.
 
 # type = "response" returns predictions
 # on the original count scale.
@@ -147,7 +174,8 @@ species_layer_ziemanni[] <-
 predicted_count_funestus <- predict(
   c(
     covs,
-    species_layer_funestus
+    species_layer_funestus,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -157,7 +185,8 @@ predicted_count_funestus <- predict(
 predicted_count_gambiae <- predict(
   c(
     covs,
-    species_layer_gambiae
+    species_layer_gambiae,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -167,7 +196,8 @@ predicted_count_gambiae <- predict(
 predicted_count_hancocki <- predict(
   c(
     covs,
-    species_layer_hancocki
+    species_layer_hancocki,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -177,7 +207,8 @@ predicted_count_hancocki <- predict(
 predicted_count_moucheti <- predict(
   c(
     covs,
-    species_layer_moucheti
+    species_layer_moucheti,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -187,7 +218,8 @@ predicted_count_moucheti <- predict(
 predicted_count_paludis <- predict(
   c(
     covs,
-    species_layer_paludis
+    species_layer_paludis,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -197,7 +229,8 @@ predicted_count_paludis <- predict(
 predicted_count_an_sp <- predict(
   c(
     covs,
-    species_layer_an_sp
+    species_layer_an_sp,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -207,7 +240,8 @@ predicted_count_an_sp <- predict(
 predicted_count_ziemanni <- predict(
   c(
     covs,
-    species_layer_ziemanni
+    species_layer_ziemanni,
+    n_households_layer
   ),
   anopheles_hierarchical_gam,
   type = "response"
@@ -276,23 +310,39 @@ names(
 
 # NOTE:
 #
-# This keeps the probability calculation from the
-# current modelling workflow.
-#
-# The probability formulation will be considered
-# separately from this script-organisation change.
+# Predictions were standardised to one household
+# by setting n_households = 1 during spatial prediction.
+
 
 expected_count_per_household <-
   predicted_counts
 
 
+# Extract the fitted negative-binomial dispersion parameter.
+
+theta <- anopheles_hierarchical_gam$family$getTheta(
+  TRUE
+)
+
+
+theta
+
+
+# Calculate the probability of detecting at least one mosquito
+# in one household using the negative-binomial distribution.
+
 household_detection_probability <-
-  1 - exp(
-    -expected_count_per_household
-  )
+  1 - (
+    theta /
+      (
+        theta +
+          expected_count_per_household
+      )
+  )^theta
 
 
 household_detection_probability
+
 
 
 # 9. Restrict predictions to Kasaï-Central
@@ -320,67 +370,7 @@ household_detection_probability_kc <- mask(
   kasai_central_boundary
 )
 
-
-# 10. Prepare observed site counts for plotting
-
-# model_data already contains:
-#
-# - household mosquito counts;
-# - household coordinates; and
-# - taxon information.
-
-# Combine household-level counts within each surveyed site.
-
-observed_site_counts <- model_data |>
-  group_by(
-    species,
-    health_zone,
-    health_area,
-    village
-  ) |>
-  summarise(
-    total_count = sum(
-      count,
-      na.rm = TRUE
-    ),
-    long_dd = mean(
-      long_dd,
-      na.rm = TRUE
-    ),
-    lat_dd = mean(
-      lat_dd,
-      na.rm = TRUE
-    ),
-    .groups = "drop"
-  )
-
-
-# Identify the maximum observed site count
-# across all taxa.
-
-maximum_site_count_all_taxa <- max(
-  observed_site_counts$total_count,
-  na.rm = TRUE
-)
-
-
-# Create a common proportional-circle size.
-
-# The same formula is used for every taxon,
-# so identical mosquito counts have identical point sizes.
-
-observed_site_counts <- observed_site_counts |>
-  mutate(
-    point_size =
-      1.8 +
-      4.2 * sqrt(
-        total_count /
-          maximum_site_count_all_taxa
-      )
-  )
-
-
-# 11. Define taxon order
+# 10. Define taxon order ------------------------------------------------------
 
 taxa <- c(
   "An. gambiae s.l.",
@@ -393,261 +383,35 @@ taxa <- c(
 )
 
 
-# 11. Define taxon order
+# Taxa included in the combined figure.
+# Unidentified An. sp. is excluded.
 
-taxa <- c(
+map_taxa <- c(
   "An. gambiae s.l.",
   "An. funestus gp",
+  "An. paludis",
   "An. hancocki",
   "An. moucheti",
-  "An. paludis",
-  "An. sp.",
   "An. ziemanni"
 )
 
 
-# 12. Create function for taxon-specific prediction maps
+# 11. Calculate Multivariate Environmental Similarity Surface ----------------
 
-create_prediction_map <- function(
-    taxon_name
-) {
-  
-  # Select prediction raster for the taxon.
-  
-  prediction_raster <-
-    household_detection_probability_kc[[
-      taxon_name
-    ]]
-  
-  
-  # Select surveyed sites where the taxon was observed.
-  
-  site_counts <-
-    observed_site_counts |>
-    filter(
-      species == taxon_name,
-      total_count > 0
-    )
-  
-  
-  # Create map.
-  
-  ggplot() +
-    
-    # Add predicted probability surface.
-    
-    tidyterra::geom_spatraster(
-      data = prediction_raster
-    ) +
-    
-    
-    # Apply common probability colour scale.
-    #
-    # Light blue = low probability.
-    # Dark blue = high probability.
-    #
-    # The same 0-1 scale is used for all taxa,
-    # allowing direct comparison between maps.
-    
-    scale_fill_gradient(
-      low = "lightblue",
-      high = "darkblue",
-      limits = c(
-        0,
-        1
-      ),
-      breaks = c(
-        0,
-        0.25,
-        0.50,
-        0.75,
-        1
-      ),
-      labels = c(
-        "0",
-        "0.25",
-        "0.50",
-        "0.75",
-        "1.00"
-      ),
-      name =
-        "Household\nprobability\nof detection",
-      na.value = "white",
-      guide = guide_colourbar(
-        barheight = grid::unit(
-          4,
-          "cm"
-        ),
-        barwidth = grid::unit(
-          0.35,
-          "cm"
-        ),
-        title.position = "top",
-        title.hjust = 0.5
-      )
-    ) +
-    
-    
-    # Add Kasaï-Central boundary.
-    
-    tidyterra::geom_spatvector(
-      data = kasai_central_boundary,
-      fill = NA,
-      colour = "black",
-      linewidth = 0.4
-    ) +
-    
-    
-    # Overlay observed mosquito counts.
-    
-    geom_point(
-      data = site_counts,
-      mapping = aes(
-        x = long_dd,
-        y = lat_dd,
-        size = point_size
-      ),
-      shape = 21,
-      fill = "black",
-      colour = "white",
-      stroke = 0.4
-    ) +
-    
-    
-    # Use the point sizes calculated previously.
-    
-    scale_size_identity(
-      guide = "none"
-    ) +
-    
-    
-    # Add taxon name.
-    
-    labs(
-      title = bquote(
-        italic(.(taxon_name))
-      )
-    ) +
-    
-    
-    # Remove axes and map background.
-    
-    theme_void() +
-    
-    
-    # Format title and legend.
-    
-    theme(
-      plot.title = element_text(
-        hjust = 0.5,
-        size = 14
-      ),
-      legend.position = "right",
-      legend.box.spacing =
-        grid::unit(
-          0.15,
-          "cm"
-        ),
-      legend.margin = margin(
-        l = 0,
-        r = 0,
-        t = 0,
-        b = 0
-      )
-    )
-}
+# MESS compares environmental conditions across Kasaï-Central
+# with those represented by the sampled raster cells.
 
-
-# 13. Create prediction maps for all seven taxa
-
-prediction_maps <- lapply(
-  taxa,
-  create_prediction_map
+covraster <- raster::brick(
+  "data/clean/covariates.tif"
 )
 
 
-names(
-  prediction_maps
-) <- taxa
-
-
-# 14. Display individual prediction maps
-
-prediction_maps[[
-  "An. gambiae s.l."
-]]
-
-
-prediction_maps[[
-  "An. funestus gp"
-]]
-
-
-prediction_maps[[
-  "An. hancocki"
-]]
-
-
-prediction_maps[[
-  "An. moucheti"
-]]
-
-
-prediction_maps[[
-  "An. paludis"
-]]
-
-
-prediction_maps[[
-  "An. sp."
-]]
-
-
-prediction_maps[[
-  "An. ziemanni"
-]]
-
-
-# Combine all seven taxon-specific maps.
-
-combined_prediction_maps <-
-  patchwork::wrap_plots(
-    prediction_maps,
-    ncol = 4,
-    guides = "collect"
-  ) &
-  
-  theme(
-    legend.position = "right"
-  )
-
-
-combined_prediction_maps
-
-
-# 15. Calculate Multivariate Environmental Similarity Surface
-
-# MESS compares environmental conditions
-# across Kasaï-Central with environmental conditions
-# represented at the 650 sampled households.
-
-covraster <- brick(
-  covs
-)
-
-
-# model_data contains one row per household × taxon.
-
-# Therefore, retain only one environmental record
-# per sampled household.
+# Retain one environmental record per sampled raster cell.
 
 sampled_environmental_covariates <-
   model_data |>
   distinct(
-    health_zone,
-    health_area,
-    village,
-    house_number,
+    cell_id,
     .keep_all = TRUE
   ) |>
   select(
@@ -657,34 +421,59 @@ sampled_environmental_covariates <-
   as.data.frame()
 
 
-# Confirm the expected 650 household records.
+# Check dimensions and predictor names.
 
 dim(
   sampled_environmental_covariates
 )
 
+names(
+  sampled_environmental_covariates
+)
+
+names(
+  covraster
+)
+
 
 # Calculate MESS.
 
-kc_mess <- dismo::mess(
-  x = covraster,
-  v = sampled_environmental_covariates
-) |>
-  rast()
+kc_mess_raw <-
+  dismo::mess(
+    x = covraster,
+    v = sampled_environmental_covariates
+  ) |>
+  terra::rast()
 
 
 # Restrict MESS to Kasaï-Central.
 
-kc_mess <- terra::mask(
-  kc_mess,
-  kasai_central_boundary
-)
+kc_mess_raw <-
+  terra::mask(
+    kc_mess_raw,
+    kasai_central_boundary
+  )
 
 
-# Inspect MESS distribution.
+# 12. Clean MESS surface ------------------------------------------------------
+
+# Infinite values occurred where environmental
+# covariates were unavailable.
+
+kc_mess_clean <- kc_mess_raw
+
+
+kc_mess_clean[
+  is.infinite(
+    kc_mess_clean
+  )
+] <- NA
+
+
+# Inspect cleaned MESS.
 
 terra::global(
-  kc_mess,
+  kc_mess_clean,
   c(
     "min",
     "max",
@@ -694,75 +483,55 @@ terra::global(
 )
 
 
-# 16. Create environmental-similarity mask
+# 13. Create environmental-similarity mask -----------------------------------
 
-# MESS >= 0:
-# environmental conditions are represented
-# within the sampled environmental range.
+# MESS >= 0 = environmentally represented.
+# MESS < 0  = environmentally dissimilar.
+# NA        = environmental data unavailable.
 
-# MESS < 0:
-# environmental conditions are outside
-# the sampled environmental range.
-
-kc_mess_mask <- terra::ifel(
-  kc_mess >= 0,
-  1,
-  NA
-)
-
-
-# 17. Quantify environmentally similar prediction area
-
-# Identify all raster cells available
-# for prediction within Kasaï-Central.
-
-kc_prediction_area <- terra::mask(
-  covs[[1]],
-  kasai_central_boundary
-)
-
-
-# Count all prediction cells.
-
-total_kc_cells <- terra::global(
+kc_mess_mask <-
   terra::ifel(
-    !is.na(
-      kc_prediction_area
-    ),
+    kc_mess_clean >= 0,
     1,
     NA
+  )
+
+
+# 14. Apply MESS mask to predictions -----------------------------------------
+
+household_detection_probability_mess <-
+  terra::mask(
+    household_detection_probability_kc,
+    kc_mess_mask
+  )
+
+
+# Inspect final prediction ranges.
+
+household_detection_probability_mess
+
+
+terra::global(
+  household_detection_probability_mess,
+  c(
+    "min",
+    "max"
   ),
-  "sum",
   na.rm = TRUE
-)[1, 1]
+)
 
 
-# Count environmentally similar cells.
+# 15. Save spatial outputs ----------------------------------------------------
 
-environmentally_similar_cells <-
-  terra::global(
-    kc_mess_mask,
-    "sum",
-    na.rm = TRUE
-  )[1, 1]
+dir.create(
+  "outputs/spatial",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
 
-
-# Calculate percentage of Kasaï-Central
-# represented by sampled environmental conditions.
-
-percent_environmentally_similar <-
-  100 *
-  environmentally_similar_cells /
-  total_kc_cells
-
-
-percent_environmentally_similar
-
-
-# 18. Save MESS surfaces
 
 terra::writeRaster(
-  kc_mess,
+  kc_mess_clean,
   "outputs/spatial/kc_mess.tif",
   overwrite = TRUE
 )
@@ -774,278 +543,6 @@ terra::writeRaster(
   overwrite = TRUE
 )
 
-
-# 19. Apply MESS mask to model predictions
-
-household_detection_probability_mess <-
-  terra::mask(
-    household_detection_probability_kc,
-    kc_mess_mask
-  )
-
-
-household_detection_probability_mess
-
-
-# 20. Create function for MESS-supported prediction maps
-
-create_mess_prediction_map <- function(
-    taxon_name
-) {
-  
-  # Select prediction raster.
-  
-  prediction_raster <-
-    household_detection_probability_mess[[
-      taxon_name
-    ]]
-  
-  
-  # Select observed sites.
-  
-  site_counts <-
-    observed_site_counts |>
-    filter(
-      species == taxon_name,
-      total_count > 0
-    )
-  
-  
-  # Create map.
-  
-  ggplot() +
-    
-    # Fill unsupported environmental areas in grey.
-    
-    tidyterra::geom_spatvector(
-      data = kasai_central_boundary,
-      fill = "grey90",
-      colour = NA
-    ) +
-    
-    # Overlay supported predictions.
-    
-    tidyterra::geom_spatraster(
-      data = prediction_raster
-    ) +
-    
-    # Probability scale.
-    
-    scale_fill_gradient(
-      low = "lightblue",
-      high = "darkblue",
-      limits = c(
-        0,
-        1
-      ),
-      breaks = c(
-        0,
-        0.25,
-        0.50,
-        0.75,
-        1
-      ),
-      labels = c(
-        "0",
-        "0.25",
-        "0.50",
-        "0.75",
-        "1.00"
-      ),
-      name =
-        "Household\nprobability\nof detection",
-      na.value = "transparent",
-      guide = guide_colourbar(
-        barheight = grid::unit(
-          4,
-          "cm"
-        ),
-        barwidth = grid::unit(
-          0.35,
-          "cm"
-        ),
-        title.position = "top",
-        title.hjust = 0.5
-      )
-    ) +
-    
-    # Add Kasaï-Central boundary.
-    
-    tidyterra::geom_spatvector(
-      data = kasai_central_boundary,
-      fill = NA,
-      colour = "black",
-      linewidth = 0.4
-    ) +
-    
-    # Overlay observed counts.
-    
-    geom_point(
-      data = site_counts,
-      mapping = aes(
-        x = long_dd,
-        y = lat_dd,
-        size = point_size
-      ),
-      shape = 21,
-      fill = "black",
-      colour = "white",
-      stroke = 0.4
-    ) +
-    
-    scale_size_identity(
-      guide = "none"
-    ) +
-    
-    labs(
-      title = bquote(
-        italic(.(taxon_name))
-      )
-    ) +
-    
-    theme_void() +
-    
-    theme(
-      plot.title = element_text(
-        hjust = 0.5,
-        size = 14
-      ),
-      legend.position = "right",
-      legend.box.spacing =
-        grid::unit(
-          0.15,
-          "cm"
-        ),
-      legend.margin = margin(
-        l = 0,
-        r = 0,
-        t = 0,
-        b = 0
-      )
-    )
-}
-
-
-# 21. Create MESS-supported prediction maps
-
-mess_prediction_maps <- lapply(
-  taxa,
-  create_mess_prediction_map
-)
-
-
-names(
-  mess_prediction_maps
-) <- taxa
-
-
-# Display individual MESS-supported maps.
-
-mess_prediction_maps[[
-  "An. gambiae s.l."
-]]
-
-
-mess_prediction_maps[[
-  "An. funestus gp"
-]]
-
-
-mess_prediction_maps[[
-  "An. hancocki"
-]]
-
-
-mess_prediction_maps[[
-  "An. moucheti"
-]]
-
-
-mess_prediction_maps[[
-  "An. paludis"
-]]
-
-
-mess_prediction_maps[[
-  "An. sp."
-]]
-
-
-mess_prediction_maps[[
-  "An. ziemanni"
-]]
-
-
-# Combine all MESS-supported maps.
-
-combined_prediction_maps_mess <-
-  patchwork::wrap_plots(
-    mess_prediction_maps,
-    ncol = 4,
-    guides = "collect"
-  ) +
-  
-  patchwork::plot_annotation(
-    title =
-      "Predicted household probability of detection within environmentally similar areas"
-  ) &
-  
-  theme(
-    plot.title = element_text(
-      hjust = 0.5,
-      size = 11
-    ),
-    legend.position = "right"
-  )
-
-
-combined_prediction_maps_mess
-
-
-# 22. Create transparent poster version
-
-combined_prediction_maps_mess_poster <-
-  combined_prediction_maps_mess &
-  
-  theme(
-    plot.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    panel.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    legend.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    legend.key = element_rect(
-      fill = "transparent",
-      colour = NA
-    )
-  )
-
-
-combined_prediction_maps_mess_poster
-
-
-# Save if required.
-
-# ggsave(
-#   filename =
-#     "outputs/figures/kc_anopheles_mess_predictions_blue_poster.png",
-#   plot =
-#     combined_prediction_maps_mess_poster,
-#   width = 14,
-#   height = 8,
-#   units = "in",
-#   dpi = 600,
-#   bg = "transparent"
-# )
-
-
-# 23. Save spatial prediction outputs
 
 terra::writeRaster(
   household_detection_probability_kc,
@@ -1061,336 +558,706 @@ terra::writeRaster(
 )
 
 
-# 24. Create extra poster figure with five Anopheles taxa ---------------------
+# 16. Calculate observed abundance across 12 months --------------------------
 
+# For each raster cell × taxon:
+#
+# total mosquitoes
+# -----------------------------
+# household sampling occasions
+#
+# = mean mosquitoes per household sampling occasion.
 
-# Load repeated household × taxon × collection-round data.
-
-# This dataset is required here because model_data
-# contains pooled counts and therefore no longer
-# contains collection_month.
-
-count_data <- read_csv(
-  "data/clean/kc_anopheles_count_data.csv",
-  show_col_types = FALSE
-)
-
-
-# Calculate the number of collection months
-# in which each Anopheles taxon was detected
-# at each surveyed site.
-
-site_month_detection <- count_data |>
-  filter(
-    species_count > 0
-  ) |>
+observed_cell_abundance_12m <-
+  model_data |>
   group_by(
-    health_zone,
-    health_area,
-    village,
-    identification_taxon
+    cell_id,
+    species
   ) |>
   summarise(
-    months_detected = n_distinct(
-      collection_month
+    total_mosquitoes = sum(
+      count,
+      na.rm = TRUE
     ),
+    
+    total_household_sampling_occasions = sum(
+      n_households,
+      na.rm = TRUE
+    ),
+    
+    mean_mosquitoes_per_household_sampling_occasion =
+      total_mosquitoes /
+      total_household_sampling_occasions,
+    
     .groups = "drop"
+  )
+
+
+# 17. Add raster-cell coordinates --------------------------------------------
+
+# Coordinates are used only to display the aggregated
+# raster-cell observations as points.
+
+sampled_cell_ids <-
+  sort(
+    unique(
+      observed_cell_abundance_12m$cell_id
+    )
+  )
+
+
+cell_coordinates <-
+  terra::xyFromCell(
+    covs[[1]],
+    sampled_cell_ids
   ) |>
-  rename(
-    species = identification_taxon
-  ) |>
+  as.data.frame() |>
   mutate(
-    proportion_months_detected =
-      months_detected / 12
+    cell_id = sampled_cell_ids,
+    .before = 1
   )
 
 
-# Add monthly detection information
-# to observed site counts.
-
-observed_site_counts_poster <-
-  observed_site_counts |>
-  select(
-    -any_of(
-      c(
-        "months_detected",
-        "proportion_months_detected"
-      )
-    )
-  ) |>
+observed_cell_abundance_12m <-
+  observed_cell_abundance_12m |>
   left_join(
-    site_month_detection,
-    by = c(
-      "species",
-      "health_zone",
-      "health_area",
-      "village"
+    cell_coordinates,
+    by = "cell_id"
+  )
+
+
+# Check.
+
+observed_cell_abundance_12m
+
+
+stopifnot(
+  sum(
+    is.na(
+      observed_cell_abundance_12m$x
     )
-  )
-
-
-# Check monthly detection information.
-
-observed_site_counts_poster |>
-  select(
-    species,
-    health_zone,
-    total_count,
-    months_detected,
-    proportion_months_detected
-  )
-
-
-# 25. Define five taxa included in poster
-
-poster_taxa <- c(
-  "An. gambiae s.l.",
-  "An. funestus gp",
-  "An. hancocki",
-  "An. moucheti",
-  "An. paludis"
+  ) == 0
 )
 
 
-# 26. Create plotting function for five-taxa poster
+# 18. Define common map scales ------------------------------------------------
 
-create_mess_prediction_map_poster <-
-  function(
+prediction_class_labels <- c(
+  "0–0.25",
+  "0.25–0.50",
+  "0.50–0.75",
+  "0.75–1.00"
+)
+
+
+masked_class_label <-
+  "Masked (environmentally dissimilar)"
+
+
+all_prediction_classes <- c(
+  masked_class_label,
+  prediction_class_labels
+)
+
+
+prediction_class_colours <- setNames(
+  c(
+    "grey92",
+    "#BDD7E7",
+    "#6BAED6",
+    "#3182BD",
+    "#08519C"
+  ),
+  all_prediction_classes
+)
+
+
+# Probability classes are for visual display only.
+
+probability_reclassification <- matrix(
+  c(
+    0.00, 0.25, 1,
+    0.25, 0.50, 2,
+    0.50, 0.75, 3,
+    0.75, 1.000001, 4
+  ),
+  ncol = 3,
+  byrow = TRUE
+)
+
+
+# Cells specifically excluded because MESS < 0.
+
+environmentally_dissimilar_cells <-
+  terra::ifel(
+    kc_mess_clean < 0,
+    0,
+    NA
+  )
+
+
+# Use the same observed-abundance scale for every taxon.
+
+maximum_observed_abundance <- max(
+  observed_cell_abundance_12m$
+    mean_mosquitoes_per_household_sampling_occasion,
+  na.rm = TRUE
+)
+
+
+observed_abundance_breaks <- c(
+  0,
+  0.5,
+  1,
+  2,
+  5
+)
+
+
+observed_abundance_breaks <-
+  observed_abundance_breaks[
+    observed_abundance_breaks <=
+      maximum_observed_abundance
+  ]
+
+
+# 19. Define taxon names for map titles --------------------------------------
+
+taxon_expression <- function(
     taxon_name
+) {
+  
+  switch(
+    taxon_name,
+    
+    "An. gambiae s.l." =
+      quote(
+        italic("An. gambiae") *
+          " s.l."
+      ),
+    
+    "An. funestus gp" =
+      quote(
+        italic("An. funestus") *
+          " gp"
+      ),
+    
+    "An. sp." =
+      quote(
+        italic("An.") *
+          " sp."
+      ),
+    
+    bquote(
+      italic(
+        .(taxon_name)
+      )
+    )
+  )
+}
+
+
+taxon_title <- function(
+    taxon_name
+) {
+  
+  bquote(
+    "Probability of detecting " *
+      .(
+        taxon_expression(
+          taxon_name
+        )
+      ) *
+      " in households"
+  )
+}
+
+
+# 20. Create final prediction-map function -----------------------------------
+
+create_final_prediction_map <- function(
+    taxon_name,
+    compact = FALSE,
+    show_scale_bar = !compact
+) {
+  
+  # Classify predicted probabilities.
+  
+  prediction_classified <-
+    household_detection_probability_mess[[
+      taxon_name
+    ]] |>
+    terra::classify(
+      rcl = probability_reclassification,
+      include.lowest = TRUE,
+      right = FALSE
+    ) |>
+    terra::cover(
+      environmentally_dissimilar_cells
+    ) |>
+    terra::mask(
+      kasai_central_boundary
+    ) |>
+    terra::as.factor()
+  
+  
+  # Add readable class labels.
+  
+  levels(
+    prediction_classified
+  ) <- data.frame(
+    ID = 0:4,
+    probability_class =
+      all_prediction_classes
+  )
+  
+  
+  # Observed abundance for this taxon.
+  
+  observed_taxon <-
+    observed_cell_abundance_12m |>
+    filter(
+      species == taxon_name
+    ) |>
+    arrange(
+      mean_mosquitoes_per_household_sampling_occasion
+    )
+  
+  
+  # Base map.
+  
+  p <- ggplot() +
+    
+    # Predicted detection probability.
+    
+    tidyterra::geom_spatraster(
+      data = prediction_classified
+    ) +
+    
+    
+    scale_fill_manual(
+      values =
+        prediction_class_colours,
+      limits =
+        all_prediction_classes,
+      breaks = c(
+        rev(
+          prediction_class_labels
+        ),
+        masked_class_label
+      ),
+      name =
+        "Household probability\nof detection",
+      na.value =
+        "transparent",
+      na.translate =
+        FALSE,
+      drop =
+        FALSE,
+      guide =
+        guide_legend(
+          order = 1
+        )
+    ) +
+    
+    
+    # Kasaï-Central boundary.
+    
+    tidyterra::geom_spatvector(
+      data =
+        kasai_central_boundary,
+      fill =
+        NA,
+      colour =
+        "black",
+      linewidth =
+        if (compact) 0.3 else 0.4
+    ) +
+    
+    
+    # Second fill scale for observed abundance.
+    
+    ggnewscale::new_scale_fill() +
+    
+    
+    geom_point(
+      data =
+        observed_taxon,
+      aes(
+        x = x,
+        y = y,
+        fill =
+          mean_mosquitoes_per_household_sampling_occasion
+      ),
+      shape =
+        21,
+      size =
+        if (compact) 2 else 3,
+      stroke =
+        if (compact) 0.3 else 0.4,
+      colour =
+        "black"
+    ) +
+    
+    
+    scale_fill_distiller(
+      palette =
+        "YlOrRd",
+      direction =
+        1,
+      transform =
+        "log1p",
+      limits = c(
+        0,
+        maximum_observed_abundance
+      ),
+      breaks =
+        observed_abundance_breaks,
+      name =
+        "Mean mosquitoes per\nhousehold sampling occasion",
+      guide =
+        guide_colourbar(
+          order = 2,
+          barheight =
+            grid::unit(
+              35,
+              "mm"
+            ),
+          frame.colour =
+            "black",
+          ticks.colour =
+            "black"
+        )
+    ) +
+    
+    
+    theme_void(
+      base_size = 10
+    )
+  
+  
+  # Compact map for combined figure.
+  
+  if (
+    compact
   ) {
     
-    # Select prediction raster.
-    
-    prediction_raster <-
-      household_detection_probability_mess[[
-        taxon_name
-      ]]
-    
-    
-    # Select observed sites.
-    
-    site_counts <-
-      observed_site_counts_poster |>
-      filter(
-        species == taxon_name,
-        total_count > 0
-      )
-    
-    
-    # Create map.
-    
-    ggplot() +
-      
-      # Environmentally unsupported areas.
-      
-      tidyterra::geom_spatvector(
-        data = kasai_central_boundary,
-        fill = "grey90",
-        colour = NA
-      ) +
-      
-      # Predicted probability surface.
-      
-      tidyterra::geom_spatraster(
-        data = prediction_raster
-      ) +
-      
-      # Probability colour scale.
-      
-      scale_fill_gradient(
-        low = "lightblue",
-        high = "darkblue",
-        limits = c(
-          0,
-          1
-        ),
-        breaks = c(
-          0,
-          0.25,
-          0.50,
-          0.75,
-          1
-        ),
-        labels = c(
-          "0",
-          "0.25",
-          "0.50",
-          "0.75",
-          "1.00"
-        ),
-        name =
-          "Household\nprobability\nof detection",
-        na.value = "transparent",
-        guide = guide_colourbar(
-          barheight = grid::unit(
-            4,
-            "cm"
-          ),
-          barwidth = grid::unit(
-            0.35,
-            "cm"
-          ),
-          title.position = "top",
-          title.hjust = 0.5
-        )
-      ) +
-      
-      # Kasaï-Central boundary.
-      
-      tidyterra::geom_spatvector(
-        data = kasai_central_boundary,
-        fill = NA,
-        colour = "black",
-        linewidth = 0.4
-      ) +
-      
-      # Observed mosquito information.
-      #
-      # Point size = total mosquito count.
-      # Point colour = proportion of months detected.
-      
-      geom_point(
-        data = site_counts,
-        mapping = aes(
-          x = long_dd,
-          y = lat_dd,
-          size = point_size,
-          colour =
-            proportion_months_detected
-        ),
-        shape = 16
-      ) +
-      
-      scale_size_identity(
-        guide = "none"
-      ) +
-      
-      # Temporal persistence colour scale.
-      
-      scale_colour_gradient(
-        low = "mistyrose",
-        high = "deeppink",
-        limits = c(
-          1 / 12,
-          1
-        ),
-        breaks = c(
-          1 / 12,
-          3 / 12,
-          6 / 12,
-          9 / 12,
-          12 / 12
-        ),
-        labels = c(
-          "1/12",
-          "3/12",
-          "6/12",
-          "9/12",
-          "12/12"
-        ),
-        name =
-          "Months\ndetected"
-      ) +
+    p <- p +
       
       labs(
-        title = bquote(
-          italic(.(taxon_name))
-        )
+        title =
+          taxon_expression(
+            taxon_name
+          )
       ) +
       
-      theme_void() +
+      theme(
+        plot.title =
+          element_text(
+            size = 11,
+            hjust = 0.5
+          ),
+        plot.margin =
+          margin(
+            4,
+            4,
+            4,
+            4
+          )
+      )
+    
+    
+  } else {
+    
+    # Full individual map.
+    
+    p <- p +
+      
+      labs(
+        title =
+          taxon_title(
+            taxon_name
+          ),
+        
+        subtitle =
+          "Kasaï-Central, DRC, predictions shown only in areas environmentally similar to sampled sites"
+      ) +
       
       theme(
-        plot.title = element_text(
-          hjust = 0.5,
-          size = 14
-        ),
-        legend.position = "right"
+        plot.title =
+          element_text(
+            size = 13,
+            face = "bold",
+            hjust = 0
+          ),
+        plot.subtitle =
+          element_text(
+            size = 9.5,
+            colour = "grey30",
+            hjust = 0,
+            margin =
+              margin(
+                b = 6
+              )
+          ),
+        plot.title.position =
+          "plot",
+        legend.title =
+          element_text(
+            size = 9,
+            lineheight = 1.1
+          ),
+        legend.text =
+          element_text(
+            size = 8.5
+          ),
+        legend.spacing.y =
+          grid::unit(
+            4,
+            "mm"
+          ),
+        legend.box.just =
+          "left",
+        plot.margin =
+          margin(
+            8,
+            8,
+            8,
+            8
+          ),
+        plot.background =
+          element_rect(
+            fill = "white",
+            colour = NA
+          )
       )
   }
+  
+  
+  p
+}
 
 
-# 27. Create five poster maps
+# 21. Create individual maps --------------------------------------------------
 
-poster_prediction_maps <- lapply(
-  poster_taxa,
-  create_mess_prediction_map_poster
-)
+# Create one individual map for each identified taxon.
+# An. sp. is excluded.
+
+final_prediction_maps <-
+  lapply(
+    map_taxa,
+    create_final_prediction_map,
+    compact = FALSE
+  )
 
 
 names(
-  poster_prediction_maps
-) <- poster_taxa
+  final_prediction_maps
+) <- map_taxa
 
 
-# 28. Combine five taxon-specific poster maps
+# Display individual maps.
 
-combined_prediction_maps_mess_5_taxa <-
+final_prediction_maps[[
+  "An. gambiae s.l."
+]]
+
+final_prediction_maps[[
+  "An. funestus gp"
+]]
+
+final_prediction_maps[[
+  "An. paludis"
+]]
+
+final_prediction_maps[[
+  "An. hancocki"
+]]
+
+final_prediction_maps[[
+  "An. moucheti"
+]]
+
+final_prediction_maps[[
+  "An. ziemanni"
+]]
+
+
+# 22. Save individual maps ----------------------------------------------------
+
+dir.create(
+  "outputs/figures",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+
+for (
+  taxon_name in map_taxa
+) {
+  
+  file_taxon_name <-
+    gsub(
+      "[^A-Za-z0-9]+",
+      "_",
+      taxon_name
+    )
+  
+  
+  ggsave(
+    filename =
+      file.path(
+        "outputs/figures",
+        paste0(
+          file_taxon_name,
+          "_detection_prediction.png"
+        )
+      ),
+    plot =
+      final_prediction_maps[[
+        taxon_name
+      ]],
+    width =
+      7.5,
+    height =
+      8,
+    units =
+      "in",
+    dpi =
+      600,
+    bg =
+      "white"
+  )
+}
+# 23. Create combined maps ----------------------------------------------------
+
+combined_taxon_maps <-
+  lapply(
+    seq_along(
+      map_taxa
+    ),
+    function(
+    i
+    ) {
+      
+      p <- create_final_prediction_map(
+        taxon_name =
+          map_taxa[i],
+        compact =
+          TRUE,
+        show_scale_bar =
+          i == 1
+      )
+      
+      
+      # Keep legends only for the first panel.
+      
+      if (
+        i > 1
+      ) {
+        
+        p <- p +
+          theme(
+            legend.position = "none"
+          )
+      }
+      
+      
+      p
+    }
+  )
+
+
+# 24. Combine six identified taxa --------------------------------------------
+
+combined_taxon_maps[-1] <- lapply(
+  combined_taxon_maps[-1],
+  function(p) p + theme(legend.position = "none")
+)
+
+
+combined_all_taxa_prediction_map <-
   patchwork::wrap_plots(
-    poster_prediction_maps,
+    combined_taxon_maps,
     ncol = 3,
     guides = "collect"
   ) +
   
   patchwork::plot_annotation(
     title =
-      "Predicted household probability of detection within environmentally similar areas"
+      "Predicted distributions masked to environmentally similar raster cells, Kasaï-Central, DRC",
+    
+    tag_levels =
+      "a",
+    
+    theme = theme(
+      plot.title =
+        element_text(
+          size = 15,
+          face = "bold",
+          hjust = 0.5,
+          margin = margin(
+            b = 10
+          )
+        ),
+      
+      plot.background =
+        element_rect(
+          fill = "white",
+          colour = NA
+        )
+    )
   ) &
   
   theme(
-    plot.title = element_text(
-      hjust = 0.5,
-      size = 11
-    ),
-    legend.position = "right"
+    plot.tag =
+      element_text(
+        size = 11,
+        face = "bold"
+      ),
+    
+    legend.box =
+      "vertical",
+    
+    legend.title =
+      element_text(
+        size = 9,
+        face = "bold"
+      ),
+    
+    legend.text =
+      element_text(
+        size = 8.5
+      ),
+    
+    legend.spacing.y =
+      grid::unit(
+        5,
+        "mm"
+      )
   )
 
 
-combined_prediction_maps_mess_5_taxa
+# Display combined figure.
+
+combined_all_taxa_prediction_map
 
 
-# 29. Create transparent poster version
-
-combined_prediction_maps_mess_5_taxa_poster <-
-  combined_prediction_maps_mess_5_taxa &
-  
-  theme(
-    plot.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    panel.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    legend.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    legend.box.background = element_rect(
-      fill = "transparent",
-      colour = NA
-    ),
-    legend.key = element_rect(
-      fill = "transparent",
-      colour = NA
-    )
-  )
-
-
-combined_prediction_maps_mess_5_taxa_poster
-
-
-# 30. Save five-taxa poster figure
+# 25. Save combined figure ----------------------------------------------------
 
 ggsave(
   filename =
-    "outputs/figures/kc_anopheles_5_taxa_detection_months_poster.png",
+    "outputs/figures/kc_all_anopheles_detection_predictions.png",
   plot =
-    combined_prediction_maps_mess_5_taxa_poster,
-  width = 18,
-  height = 12,
-  units = "in",
-  dpi = 600,
-  bg = "transparent"
+    combined_all_taxa_prediction_map,
+  width =
+    13,
+  height =
+    9,
+  units =
+    "in",
+  dpi =
+    600,
+  bg =
+    "white"
 )
