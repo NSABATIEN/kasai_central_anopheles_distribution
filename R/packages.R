@@ -27,6 +27,8 @@ library(mgcv) # Fit Generalised Additive Models (GAM)
 library(patchwork) # Combine multiple ggplots into a single figure
 library(ggh4x) # Advanced extensions for ggplot2
 library(idpalette) # TheKids colour palettes for better quality plots
+library(ggnewscale) # Allow multiple colour/fill scales in the same ggplot
+library(ggspatial) # Add map elements such as north arrows and scale bars
 
 # Spatial ecology and SDM utilities
 library(sdmtools) # Spatial and SDM evaluation tools (e.g., distances, metrics)
