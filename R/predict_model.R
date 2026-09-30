@@ -642,59 +642,18 @@ stopifnot(
 
 # 18. Define common map scales ------------------------------------------------
 
-prediction_class_labels <- c(
-  "0–0.25",
-  "0.25–0.50",
-  "0.50–0.75",
-  "0.75–1.00"
-)
+# Areas excluded because MESS < 0.
 
-
-masked_class_label <-
-  "Masked (environmentally dissimilar)"
-
-
-all_prediction_classes <- c(
-  masked_class_label,
-  prediction_class_labels
-)
-
-
-prediction_class_colours <- setNames(
-  c(
-    "grey92",
-    "#BDD7E7",
-    "#6BAED6",
-    "#3182BD",
-    "#08519C"
-  ),
-  all_prediction_classes
-)
-
-
-# Probability classes are for visual display only.
-
-probability_reclassification <- matrix(
-  c(
-    0.00, 0.25, 1,
-    0.25, 0.50, 2,
-    0.50, 0.75, 3,
-    0.75, 1.000001, 4
-  ),
-  ncol = 3,
-  byrow = TRUE
-)
-
-
-# Cells specifically excluded because MESS < 0.
-
-environmentally_dissimilar_cells <-
-  terra::ifel(
-    kc_mess_clean < 0,
-    0,
-    NA
+mess_excluded_polygons <-
+  terra::as.polygons(
+    terra::ifel(
+      kc_mess_clean < 0,
+      1,
+      NA
+    ),
+    dissolve = TRUE,
+    na.rm = TRUE
   )
-
 
 # Use the same observed-abundance scale for every taxon.
 
@@ -773,7 +732,22 @@ taxon_title <- function(
 }
 
 
+
 # 20. Create final prediction-map function -----------------------------------
+
+# Areas excluded because MESS < 0.
+
+mess_excluded_polygons <-
+  terra::as.polygons(
+    terra::ifel(
+      kc_mess_clean < 0,
+      1,
+      NA
+    ),
+    dissolve = TRUE,
+    na.rm = TRUE
+  )
+
 
 create_final_prediction_map <- function(
     taxon_name,
@@ -781,37 +755,17 @@ create_final_prediction_map <- function(
     show_scale_bar = !compact
 ) {
   
-  # Classify predicted probabilities.
+  # Continuous predicted probability for this taxon.
   
-  prediction_classified <-
+  prediction_continuous <-
     household_detection_probability_mess[[
       taxon_name
     ]] |>
-    terra::classify(
-      rcl = probability_reclassification,
-      include.lowest = TRUE,
-      right = FALSE
-    ) |>
-    terra::cover(
-      environmentally_dissimilar_cells
-    ) |>
     terra::mask(
       kasai_central_boundary
-    ) |>
-    terra::as.factor()
+    )
   
-  
-  # Add readable class labels.
-  
-  levels(
-    prediction_classified
-  ) <- data.frame(
-    ID = 0:4,
-    probability_class =
-      all_prediction_classes
-  )
-  
-  
+
   # Observed abundance for this taxon.
   
   observed_taxon <-
@@ -828,36 +782,46 @@ create_final_prediction_map <- function(
   
   p <- ggplot() +
     
+    # Environmentally dissimilar areas.
+    
+    tidyterra::geom_spatvector(
+      data = mess_excluded_polygons,
+      fill = "grey90",
+      colour = NA,
+      show.legend = FALSE
+    ) +
+    
     # Predicted detection probability.
     
     tidyterra::geom_spatraster(
-      data = prediction_classified
+      data = prediction_continuous
     ) +
     
-    
-    scale_fill_manual(
-      values =
-        prediction_class_colours,
-      limits =
-        all_prediction_classes,
-      breaks = c(
-        rev(
-          prediction_class_labels
-        ),
-        masked_class_label
+    scale_fill_gradientn(
+      colours = c(
+        "#F7FBFF",
+        "#BDD7E7",
+        "#6BAED6",
+        "#3182BD",
+        "#08519C"
       ),
-      name =
-        "Household probability\nof detection",
-      na.value =
-        "transparent",
-      na.translate =
-        FALSE,
-      drop =
-        FALSE,
-      guide =
-        guide_legend(
-          order = 1
-        )
+      values = scales::rescale(
+        c(0, 0.25, 0.50, 0.75, 1)
+      ),
+      limits = c(0, 1),
+      breaks = c(0, 0.25, 0.50, 0.75, 1),
+      labels = c(
+        "0.00",
+        "0.25",
+        "0.50",
+        "0.75",
+        "1.00"
+      ),
+      name = "Household probability\nof detection",
+      na.value = "transparent",
+      guide = guide_colourbar(
+        order = 1
+      )
     ) +
     
     
@@ -914,7 +878,7 @@ create_final_prediction_map <- function(
       breaks =
         observed_abundance_breaks,
       name =
-        "Mean mosquitoes per\nhousehold sampling occasion",
+        "Observed mean mosquitoes per\nhousehold sampling occasion\n(12-month survey)",
       guide =
         guide_colourbar(
           order = 2,
