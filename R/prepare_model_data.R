@@ -288,8 +288,11 @@ counts_coords |>
 
 # 9. Extract environmental covariates for sampled raster cells
 
-# Identify the unique raster cells represented
-# in the mosquito observations.
+# The model response is aggregated by:
+# raster cell × collection month × taxon.
+#
+# Therefore, environmental predictors are extracted
+# once for each unique sampled raster cell.
 
 sampled_cells <- sort(
   unique(
