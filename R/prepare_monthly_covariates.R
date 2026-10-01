@@ -191,3 +191,146 @@ names(
 names(
   monthly_vapr_drc
 )
+
+
+# 8. Select Kasaï-Central health zones
+
+# Select all GRID3 health zones belonging to
+# Kasaï-Central Province.
+
+kasai_central_health_zones <- drc_health_zones |>
+  filter(
+    province == "Kasaï-Central"
+  )
+
+# Confirm the number of selected health zones.
+
+nrow(
+  kasai_central_health_zones
+)
+
+
+# Check the selected health-zone names.
+
+kasai_central_health_zones$zonesante
+
+
+# 9. Create Kasaï-Central boundary
+
+# Dissolve all selected health-zone polygons into
+# one Kasaï-Central provincial boundary.
+
+kasai_central_boundary <- terra::aggregate(
+  kasai_central_health_zones
+)
+
+
+# Inspect the Kasaï-Central boundary.
+
+kasai_central_boundary
+
+
+# 10. Crop monthly climate rasters to Kasaï-Central
+
+# Crop the DRC monthly climate rasters to the spatial extent
+# of Kasaï-Central Province.
+
+monthly_tavg_kc <- terra::crop(
+  monthly_tavg_drc,
+  kasai_central_boundary
+)
+
+monthly_prec_kc <- terra::crop(
+  monthly_prec_drc,
+  kasai_central_boundary
+)
+
+monthly_vapr_kc <- terra::crop(
+  monthly_vapr_drc,
+  kasai_central_boundary
+)
+
+
+# 11. Mask monthly climate rasters to Kasaï-Central
+
+# Mask the cropped monthly climate rasters using the
+# Kasaï-Central provincial boundary.
+#
+# Raster cells outside Kasaï-Central are set to NA.
+
+monthly_tavg_kc <- terra::mask(
+  monthly_tavg_kc,
+  kasai_central_boundary
+)
+
+monthly_prec_kc <- terra::mask(
+  monthly_prec_kc,
+  kasai_central_boundary
+)
+
+monthly_vapr_kc <- terra::mask(
+  monthly_vapr_kc,
+  kasai_central_boundary
+)
+
+
+# 12. Check Kasaï-Central monthly climate rasters
+
+# Confirm that each climate raster contains
+# 12 monthly layers.
+
+nlyr(
+  monthly_tavg_kc
+)
+
+nlyr(
+  monthly_prec_kc
+)
+
+nlyr(
+  monthly_vapr_kc
+)
+
+
+# 13. Visually inspect Kasaï-Central monthly climate rasters
+
+# Plot selected months to inspect seasonal spatial patterns
+# across Kasaï-Central.
+
+# 13. Visually inspect Kasaï-Central monthly climate rasters
+
+# Plot the 12 monthly mean-temperature layers to inspect
+# seasonal spatial patterns across Kasaï-Central.
+
+plot(
+  monthly_tavg_kc[[1:12]],
+  axes = FALSE,
+  col = idem(
+    50,
+    rev = TRUE
+  )
+)
+
+
+# Plot the 12 monthly precipitation layers.
+
+plot(
+  monthly_prec_kc[[1:12]],
+  axes = FALSE,
+  col = idem(
+    50,
+    rev = TRUE
+  )
+)
+
+
+# Plot the 12 monthly water-vapour-pressure layers.
+
+plot(
+  monthly_vapr_kc[[1:12]],
+  axes = FALSE,
+  col = idem(
+    50,
+    rev = TRUE
+  )
+)
