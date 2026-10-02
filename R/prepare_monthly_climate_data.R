@@ -45,65 +45,34 @@ nlyr(monthly_prec)
 nlyr(monthly_vapr)
 
 
-# 4. Load DRC health-zone boundaries
+# 4. Load Kasaï-Central health-zone boundaries
 
-drc_health_zones <- vect(
-  "data/downloads/grid3/grid3_cod_health_zones_v8_0.gpkg"
+kasai_central_health_zones <- vect(
+  "data/clean/kc_health_zones.gpkg"
 )
 
 
-# 5. Select Kasaï-Central health zones
-
-kasai_central_health_zones <- drc_health_zones |>
-  filter(
-    province == "Kasaï-Central"
-  )
-
-
-# 6. Create Kasaï-Central boundary
+# 5. Create Kasaï-Central boundary
 
 kasai_central_boundary <- aggregate(
   kasai_central_health_zones
 )
 
+# 6. Crop and mask monthly climate rasters to Kasaï-Central
 
-# 7. Crop monthly climate rasters to Kasaï-Central
+monthly_tavg_kc <- monthly_tavg |>
+  crop(kasai_central_boundary) |>
+  mask(kasai_central_boundary)
 
-monthly_tavg_kc <- crop(
-  monthly_tavg,
-  kasai_central_boundary
-)
+monthly_prec_kc <- monthly_prec |>
+  crop(kasai_central_boundary) |>
+  mask(kasai_central_boundary)
 
-monthly_prec_kc <- crop(
-  monthly_prec,
-  kasai_central_boundary
-)
+monthly_vapr_kc <- monthly_vapr |>
+  crop(kasai_central_boundary) |>
+  mask(kasai_central_boundary)
 
-monthly_vapr_kc <- crop(
-  monthly_vapr,
-  kasai_central_boundary
-)
-
-
-# 8. Mask rasters to Kasaï-Central boundary
-
-monthly_tavg_kc <- mask(
-  monthly_tavg_kc,
-  kasai_central_boundary
-)
-
-monthly_prec_kc <- mask(
-  monthly_prec_kc,
-  kasai_central_boundary
-)
-
-monthly_vapr_kc <- mask(
-  monthly_vapr_kc,
-  kasai_central_boundary
-)
-
-
-# 9. Plot monthly climate rasters
+# 7. Plot monthly climate rasters
 
 plot(
   monthly_tavg_kc,
@@ -133,7 +102,7 @@ plot(
 )
 
 
-# 10. Save monthly climate rasters
+# 8. Save monthly climate rasters
 
 writeRaster(
   monthly_tavg_kc,
@@ -154,7 +123,7 @@ writeRaster(
 )
 
 
-# 11. Check that files were saved
+# 9. Check that files were saved
 
 file.exists(
   "data/clean/monthly_tavg_kc.tif"
