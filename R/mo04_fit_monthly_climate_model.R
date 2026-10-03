@@ -7,7 +7,7 @@
 source("R/packages.R")
 
 
-# 2. Load monthly climate model data
+# 2. Load monthly model data
 
 monthly_data <- readRDS(
   "data/clean/kc_anopheles_monthly_climate_model_data.rds"
@@ -27,19 +27,12 @@ monthly_data <- monthly_data |>
     tavg,
     prec,
     vapr,
-    landcover_pc1,
-    landcover_pc2,
-    landcover_pc3,
-    landcover_pc4,
-    landcover_pc5
+    landcover_wc_pc1,
+    landcover_wc_pc2,
+    landcover_wc_pc3,
+    landcover_wc_pc4,
+    landcover_wc_pc5
   )
-
-
-# Check data
-
-View(
-  monthly_data
-)
 
 
 # 3. Check mosquito counts by species
@@ -56,19 +49,7 @@ monthly_data |>
   )
 
 
-# 4. Fit negative-binomial GAM
-#
-# Shared effects:
-# - monthly temperature, precipitation and vapour pressure
-# - static land-cover PCs
-#
-# Species-specific effects:
-# - temperature
-# - precipitation
-# - vapour pressure
-#
-# Offset:
-# - number of sampled households
+# 4. Fit original negative-binomial GAM
 
 monthly_climate_landcover_gam <- gam(
   count ~
@@ -79,11 +60,11 @@ monthly_climate_landcover_gam <- gam(
     s(prec) +
     s(vapr) +
     
-    s(landcover_pc1) +
-    s(landcover_pc2) +
-    s(landcover_pc3) +
-    s(landcover_pc4) +
-    s(landcover_pc5) +
+    s(landcover_wc_pc1) +
+    s(landcover_wc_pc2) +
+    s(landcover_wc_pc3) +
+    s(landcover_wc_pc4) +
+    s(landcover_wc_pc5) +
     
     s(tavg, species, bs = "re") +
     s(prec, species, bs = "re") +
@@ -99,7 +80,35 @@ monthly_climate_landcover_gam <- gam(
 )
 
 
-# 5. Save model
+# 5. Fit comparison model with shared climate effects only
+
+monthly_climate_landcover_gam_shared <- gam(
+  count ~
+    
+    species +
+    
+    s(tavg) +
+    s(prec) +
+    s(vapr) +
+    
+    s(landcover_wc_pc1) +
+    s(landcover_wc_pc2) +
+    s(landcover_wc_pc3) +
+    s(landcover_wc_pc4) +
+    s(landcover_wc_pc5) +
+    
+    offset(
+      log(n_households)
+    ),
+  
+  family = nb(),
+  method = "REML",
+  data = monthly_data
+)
+
+
+
+# 6. Save original model
 
 saveRDS(
   monthly_climate_landcover_gam,
