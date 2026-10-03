@@ -130,7 +130,7 @@ sum(
 )
 
 
-# 8. Match WorldClim calendar months to survey rounds
+# 8. Match WorldClim calendar months to entomological survey rounds
 
 month_lookup <- tibble(
   month = c(
@@ -259,8 +259,68 @@ cell_month |>
     missing_vapr = sum(is.na(vapr))
   )
 
+# 12. Load static land-cover PCs
 
-# 12. Join monthly climate values to mosquito counts
+covariates <- rast(
+  "data/clean/covariates.tif"
+)
+
+landcover <- covariates[[
+  c(
+    "landcover_pc1",
+    "landcover_pc2",
+    "landcover_pc3",
+    "landcover_pc4",
+    "landcover_pc5"
+  )
+]]
+
+
+# 13. Align land-cover PCs to the monthly climate grid
+
+landcover_climate_grid <- resample(
+  landcover,
+  climate_grid,
+  method = "bilinear"
+)
+
+
+# Check that land cover now uses the same grid
+
+compareGeom(
+  climate_grid,
+  landcover_climate_grid[[1]],
+  stopOnError = FALSE
+)
+
+
+# 14. Extract static land-cover values
+
+landcover_values <- landcover_climate_grid[
+  cell_month$climate_cell_id
+]
+
+
+cell_month <- bind_cols(
+  cell_month,
+  landcover_values
+)
+
+# 15. Check environmental covariates
+
+cell_month |>
+  summarise(
+    missing_tavg = sum(is.na(tavg)),
+    missing_prec = sum(is.na(prec)),
+    missing_vapr = sum(is.na(vapr)),
+    missing_landcover_pc1 = sum(is.na(landcover_pc1)),
+    missing_landcover_pc2 = sum(is.na(landcover_pc2)),
+    missing_landcover_pc3 = sum(is.na(landcover_pc3)),
+    missing_landcover_pc4 = sum(is.na(landcover_pc4)),
+    missing_landcover_pc5 = sum(is.na(landcover_pc5))
+  )
+
+# 16. Join environmental covariates to mosquito counts
 
 monthly_model_data <- cell_month_counts |>
   left_join(
@@ -272,21 +332,15 @@ monthly_model_data <- cell_month_counts |>
   )
 
 
-# 13. Check final modelling data
+# 17. Check final modelling data
 
-monthly_model_data |>
-  glimpse()
 
-n_distinct(
-  monthly_model_data$climate_cell_id
-)
-
-sum(
-  monthly_model_data$count
+View(
+  monthly_model_data
 )
 
 
-# 14. Save monthly climate model data
+# 18. Save monthly climate model data
 
 saveRDS(
   monthly_model_data,
