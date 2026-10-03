@@ -7,7 +7,7 @@
 source("R/packages.R")
 
 
-# 2. Load monthly climate rasters
+# 2. Load prepared environmental covariates
 
 monthly_tavg_kc <- rast(
   "data/clean/monthly_tavg_kc.tif"
@@ -21,23 +21,12 @@ monthly_vapr_kc <- rast(
   "data/clean/monthly_vapr_kc.tif"
 )
 
-
-# Confirm that monthly climate rasters use the same grid
-
-compareGeom(
-  monthly_tavg_kc[[1]],
-  monthly_prec_kc[[1]],
-  stopOnError = FALSE
-)
-
-compareGeom(
-  monthly_tavg_kc[[1]],
-  monthly_vapr_kc[[1]],
-  stopOnError = FALSE
+landcover_pcs_wc <- rast(
+  "data/clean/landcover_pcs_worldclim_grid.tif"
 )
 
 
-# Use the common monthly climate grid as the spatial reference
+# Use WorldClim as the reference grid
 
 climate_grid <- monthly_tavg_kc[[1]]
 
@@ -50,7 +39,7 @@ count_data <- read_csv(
 )
 
 
-# 4. Create household-level counts by month and species
+# 4. Create household counts by month and species
 
 counts <- count_data |>
   group_by(
@@ -94,7 +83,7 @@ coords <- read_csv(
   )
 
 
-# 6. Join household coordinates to mosquito counts
+# 6. Join coordinates and assign WorldClim cells
 
 counts_coords <- counts |>
   left_join(
@@ -108,8 +97,6 @@ counts_coords <- counts |>
   )
 
 
-# 7. Assign households to the monthly climate grid
-
 counts_coords$climate_cell_id <- cellFromXY(
   climate_grid,
   counts_coords |>
@@ -121,16 +108,7 @@ counts_coords$climate_cell_id <- cellFromXY(
 )
 
 
-# Check that all observations received a climate cell
-
-sum(
-  is.na(
-    counts_coords$climate_cell_id
-  )
-)
-
-
-# 8. Match WorldClim calendar months to entomological survey rounds
+# 7. Match calendar months to survey rounds
 
 month_lookup <- tibble(
   month = c(
@@ -154,8 +132,6 @@ month_lookup <- tibble(
 )
 
 
-# Add calendar month to survey data
-
 counts_coords <- counts_coords |>
   left_join(
     month_lookup,
@@ -163,18 +139,8 @@ counts_coords <- counts_coords |>
   )
 
 
-# Check the matching
-
-counts_coords |>
-  distinct(
-    collection_month,
-    month
-  ) |>
-  arrange(
-    month
-  )
-
-# 9. Aggregate mosquito counts by climate cell, month and species
+# 8. Aggregate mosquito counts by climate cell,
+# month and species
 
 cell_month_counts <- counts_coords |>
   group_by(
@@ -192,7 +158,7 @@ cell_month_counts <- counts_coords |>
   )
 
 
-# Count sampled households in each climate cell and month
+# Count sampled households in each cell and month
 
 cell_month_effort <- counts_coords |>
   distinct(
@@ -212,7 +178,7 @@ cell_month_effort <- counts_coords |>
   )
 
 
-# Add sampling effort to species counts
+# Add sampling effort
 
 cell_month_counts <- cell_month_counts |>
   left_join(
@@ -224,7 +190,8 @@ cell_month_counts <- cell_month_counts |>
     )
   )
 
-# 10. Create unique climate cell × month combinations
+
+# 9. Create unique climate cell × month combinations
 
 cell_month <- cell_month_counts |>
   distinct(
@@ -233,7 +200,7 @@ cell_month <- cell_month_counts |>
   )
 
 
-# 11. Extract monthly climate values
+# 10. Extract monthly climate values
 
 extract_monthly_value <- function(
     data,
@@ -281,53 +248,9 @@ cell_month <- cell_month |>
   )
 
 
-# Check for missing climate values
+# 11. Extract static land-cover PCs
 
-cell_month |>
-  summarise(
-    missing_tavg = sum(is.na(tavg)),
-    missing_prec = sum(is.na(prec)),
-    missing_vapr = sum(is.na(vapr))
-  )
-
-# 12. Load static land-cover PCs
-
-covariates <- rast(
-  "data/clean/covariates.tif"
-)
-
-landcover <- covariates[[
-  c(
-    "landcover_pc1",
-    "landcover_pc2",
-    "landcover_pc3",
-    "landcover_pc4",
-    "landcover_pc5"
-  )
-]]
-
-
-# 13. Align land-cover PCs to the monthly climate grid
-
-landcover_climate_grid <- resample(
-  landcover,
-  climate_grid,
-  method = "bilinear"
-)
-
-
-# Check that land cover now uses the same grid
-
-compareGeom(
-  climate_grid,
-  landcover_climate_grid[[1]],
-  stopOnError = FALSE
-)
-
-
-# 14. Extract static land-cover values
-
-landcover_values <- landcover_climate_grid[
+landcover_values <- landcover_pcs_wc[
   cell_month$climate_cell_id
 ]
 
@@ -337,21 +260,9 @@ cell_month <- bind_cols(
   landcover_values
 )
 
-# 15. Check environmental covariates
 
-cell_month |>
-  summarise(
-    missing_tavg = sum(is.na(tavg)),
-    missing_prec = sum(is.na(prec)),
-    missing_vapr = sum(is.na(vapr)),
-    missing_landcover_pc1 = sum(is.na(landcover_pc1)),
-    missing_landcover_pc2 = sum(is.na(landcover_pc2)),
-    missing_landcover_pc3 = sum(is.na(landcover_pc3)),
-    missing_landcover_pc4 = sum(is.na(landcover_pc4)),
-    missing_landcover_pc5 = sum(is.na(landcover_pc5))
-  )
-
-# 16. Join environmental covariates to mosquito counts
+# 12. Join environmental covariates
+# to mosquito counts
 
 monthly_model_data <- cell_month_counts |>
   left_join(
@@ -363,14 +274,14 @@ monthly_model_data <- cell_month_counts |>
   )
 
 
-# 17. Check final modelling data
+# 13. Check final model data
 
 View(
   monthly_model_data
 )
 
 
-# 18. Save monthly climate model data
+# 14. Save monthly model data
 
 saveRDS(
   monthly_model_data,
