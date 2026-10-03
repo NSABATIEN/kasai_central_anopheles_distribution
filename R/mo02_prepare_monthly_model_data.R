@@ -334,7 +334,6 @@ monthly_model_data <- cell_month_counts |>
 
 # 17. Check final modelling data
 
-
 View(
   monthly_model_data
 )
