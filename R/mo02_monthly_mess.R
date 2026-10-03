@@ -7,11 +7,23 @@
 source("R/packages.R")
 
 
-# 2. Load monthly climate rasters
+# 2. Load monthly environmental covariates
 
-monthly_tavg_kc <- rast("data/clean/monthly_tavg_kc.tif")
-monthly_prec_kc <- rast("data/clean/monthly_prec_kc.tif")
-monthly_vapr_kc <- rast("data/clean/monthly_vapr_kc.tif")
+monthly_tavg_kc <- rast(
+  "data/clean/monthly_tavg_kc.tif"
+)
+
+monthly_prec_kc <- rast(
+  "data/clean/monthly_prec_kc.tif"
+)
+
+monthly_vapr_kc <- rast(
+  "data/clean/monthly_vapr_kc.tif"
+)
+
+landcover_pcs_wc <- rast(
+  "data/clean/landcover_pcs_worldclim_grid.tif"
+)
 
 
 # Use WorldClim as the reference grid
@@ -19,33 +31,7 @@ monthly_vapr_kc <- rast("data/clean/monthly_vapr_kc.tif")
 climate_grid <- monthly_tavg_kc[[1]]
 
 
-# 3. Load static land-cover PCs
-
-covariates <- rast(
-  "data/clean/covariates.tif"
-)
-
-landcover <- covariates[[
-  c(
-    "landcover_pc1",
-    "landcover_pc2",
-    "landcover_pc3",
-    "landcover_pc4",
-    "landcover_pc5"
-  )
-]]
-
-
-# 4. Align land-cover PCs to the WorldClim grid
-
-landcover_climate_grid <- resample(
-  landcover,
-  climate_grid,
-  method = "bilinear"
-)
-
-
-# 5. Load sampled households and survey rounds
+# 3. Load sampled households and survey rounds
 
 survey_households <- read_csv(
   "data/clean/kc_anopheles_count_data.csv",
@@ -60,7 +46,7 @@ survey_households <- read_csv(
   )
 
 
-# 6. Load household coordinates
+# 4. Load household coordinates
 
 coords <- read_csv(
   "data/clean/kc_household_coords.csv",
@@ -88,7 +74,7 @@ survey_households <- survey_households |>
   )
 
 
-# 7. Assign sampled households to WorldClim cells
+# 5. Assign sampled households to WorldClim cells
 
 survey_households$climate_cell_id <- cellFromXY(
   climate_grid,
@@ -101,7 +87,7 @@ survey_households$climate_cell_id <- cellFromXY(
 )
 
 
-# 8. Match calendar months to survey rounds
+# 6. Match calendar months to survey rounds
 
 month_lookup <- tibble(
   month = c(
@@ -132,7 +118,7 @@ survey_households <- survey_households |>
   )
 
 
-# 9. Keep unique sampled WorldClim cell × month combinations
+# 7. Keep unique sampled WorldClim cell × month combinations
 
 sampled_cells <- survey_households |>
   distinct(
@@ -141,7 +127,7 @@ sampled_cells <- survey_households |>
   )
 
 
-# 10. Extract monthly climate at sampled cells
+# 8. Extract monthly climate at sampled cells
 
 extract_monthly_value <- function(
     data,
@@ -189,33 +175,33 @@ sampled_cells <- sampled_cells |>
   )
 
 
-# 11. Extract static land-cover PCs at sampled cells
+# 9. Extract static land-cover PCs at sampled cells
 
 sampled_cells <- bind_cols(
   sampled_cells,
-  landcover_climate_grid[
+  landcover_pcs_wc[
     sampled_cells$climate_cell_id
   ]
 )
 
 
-# 12. Define sampled environmental reference space
+# 10. Define sampled environmental reference space
 
 sampled_environment <- sampled_cells |>
   select(
     tavg,
     prec,
     vapr,
-    landcover_pc1,
-    landcover_pc2,
-    landcover_pc3,
-    landcover_pc4,
-    landcover_pc5
+    landcover_wc_pc1,
+    landcover_wc_pc2,
+    landcover_wc_pc3,
+    landcover_wc_pc4,
+    landcover_wc_pc5
   ) |>
   as.data.frame()
 
 
-# 13. Load Kasaï-Central boundary
+# 11. Load Kasaï-Central boundary
 
 kc_boundary <- vect(
   "data/clean/kc_health_zones.gpkg"
@@ -223,9 +209,12 @@ kc_boundary <- vect(
   aggregate()
 
 
-# 14. Calculate MESS for one calendar month
+# 12. Calculate MESS for one calendar month
 
-calculate_monthly_mess <- function(month_index) {
+calculate_monthly_mess <- function(
+    month_index
+) {
+  
   
   # Monthly climate + static land cover
   
@@ -233,7 +222,7 @@ calculate_monthly_mess <- function(month_index) {
     monthly_tavg_kc[[month_index]],
     monthly_prec_kc[[month_index]],
     monthly_vapr_kc[[month_index]],
-    landcover_climate_grid
+    landcover_pcs_wc
   )
   
   
@@ -243,20 +232,21 @@ calculate_monthly_mess <- function(month_index) {
     "tavg",
     "prec",
     "vapr",
-    "landcover_pc1",
-    "landcover_pc2",
-    "landcover_pc3",
-    "landcover_pc4",
-    "landcover_pc5"
+    "landcover_wc_pc1",
+    "landcover_wc_pc2",
+    "landcover_wc_pc3",
+    "landcover_wc_pc4",
+    "landcover_wc_pc5"
   )
   
   
-  # Convert each layer for dismo::mess()
+  # Convert layers for dismo::mess()
   
   monthly_environment_raster <- raster::stack(
     lapply(
       1:nlyr(monthly_environment),
       function(i) {
+        
         raster::raster(
           monthly_environment[[i]]
         )
@@ -302,7 +292,7 @@ calculate_monthly_mess <- function(month_index) {
 }
 
 
-# 15. Calculate MESS for all 12 months
+# 13. Calculate MESS for all 12 months
 
 monthly_mess <- rast(
   lapply(
@@ -316,7 +306,7 @@ names(
 ) <- month.name
 
 
-# 16. Check monthly MESS results
+# 14. Check monthly MESS results
 
 global(
   monthly_mess,
@@ -329,7 +319,7 @@ global(
 )
 
 
-# 17. Use the same colour scale for all months
+# 15. Use the same colour scale for all months
 
 mess_limit <- max(
   abs(
@@ -341,14 +331,18 @@ mess_limit <- max(
 )
 
 
-# 18. Create monthly MESS maps
+# 16. Create monthly MESS maps
 
-create_monthly_mess_map <- function(month_name) {
+create_monthly_mess_map <- function(
+    month_name
+) {
   
   ggplot() +
     
     geom_spatraster(
-      data = monthly_mess[[month_name]]
+      data = monthly_mess[[
+        month_name
+      ]]
     ) +
     
     scale_fill_distiller(
@@ -388,7 +382,7 @@ create_monthly_mess_map <- function(month_name) {
 }
 
 
-# 19. Create MESS maps for all 12 months
+# 17. Create MESS maps for all 12 months
 
 monthly_mess_maps <- lapply(
   month.name,
@@ -396,7 +390,7 @@ monthly_mess_maps <- lapply(
 )
 
 
-# 20. Combine monthly MESS maps
+# 18. Combine monthly MESS maps
 
 monthly_mess_figure <- patchwork::wrap_plots(
   monthly_mess_maps,
@@ -407,7 +401,7 @@ monthly_mess_figure <- patchwork::wrap_plots(
 monthly_mess_figure
 
 
-# 21. Create monthly MESS masks
+# 19. Create monthly MESS masks
 
 monthly_mess_mask <- ifel(
   monthly_mess >= 0,
@@ -420,7 +414,7 @@ names(
 ) <- month.name
 
 
-# 22. Save outputs
+# 20. Save outputs
 
 dir.create(
   "outputs/spatial/monthly_climate_landcover",
