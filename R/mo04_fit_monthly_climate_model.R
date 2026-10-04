@@ -49,53 +49,49 @@ monthly_data |>
   )
 
 
-# 4. Fit original negative-binomial GAM
+# 4. Fit hierarchical negative-binomial GAM
 
 monthly_climate_landcover_gam <- gam(
   count ~
     
-    species +
+    # Separate baseline count for each Anopheles taxon
+    
+    1 + species +
+    
+    
+    # Shared responses to monthly climate conditions
     
     s(tavg) +
     s(prec) +
     s(vapr) +
+    
+    
+    # Shared responses to land-cover conditions
     
     s(landcover_wc_pc1) +
     s(landcover_wc_pc2) +
     s(landcover_wc_pc3) +
     s(landcover_wc_pc4) +
     s(landcover_wc_pc5) +
+    
+    
+    # Taxon-specific deviations in climate responses
     
     s(tavg, species, bs = "re") +
     s(prec, species, bs = "re") +
     s(vapr, species, bs = "re") +
     
-    offset(
-      log(n_households)
-    ),
-  
-  family = nb(),
-  method = "REML",
-  data = monthly_data
-)
-
-
-# 5. Fit comparison model with shared climate effects only
-
-monthly_climate_landcover_gam_shared <- gam(
-  count ~
     
-    species +
+    # Taxon-specific deviations in land-cover responses
     
-    s(tavg) +
-    s(prec) +
-    s(vapr) +
+    s(landcover_wc_pc1, species, bs = "re") +
+    s(landcover_wc_pc2, species, bs = "re") +
+    s(landcover_wc_pc3, species, bs = "re") +
+    s(landcover_wc_pc4, species, bs = "re") +
+    s(landcover_wc_pc5, species, bs = "re") +
     
-    s(landcover_wc_pc1) +
-    s(landcover_wc_pc2) +
-    s(landcover_wc_pc3) +
-    s(landcover_wc_pc4) +
-    s(landcover_wc_pc5) +
+    
+    # Adjustment for the number of contributing households
     
     offset(
       log(n_households)
@@ -107,8 +103,7 @@ monthly_climate_landcover_gam_shared <- gam(
 )
 
 
-
-# 6. Save original model
+# 5. Save fitted model
 
 saveRDS(
   monthly_climate_landcover_gam,
