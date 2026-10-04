@@ -1,5 +1,7 @@
 library(readxl)
 library(dplyr)
+library(janitor)
+library(readr)
 
 vic_data_path <- "V:/1. PhD_Journey 2025_2026/PhD_Workspace/Thesis_Databases/kc_entomo_database"
 data_folder_path <- vic_data_path
@@ -12,21 +14,40 @@ files <- list.files(
 
 latest_file <- files[which.max(file.info(files)$mtime)]
 
-data <- read_excel(latest_file, sheet = "species")
+data <- read_excel(latest_file, sheet = "species")%>%
+  clean_names()
+
 
 total_records <- nrow(data)
 View(data)
-View(data.frame(identification_taxon = data$identification_taxon))
 
-species_summary <- data |>
-  group_by(identification_taxon) |> 
+
+species_summary <- data %>%
+  filter(!is.na(identification_taxon)) %>%
+  group_by(identification_taxon) %>%
   summarise(
     count = n(),
-    percentage = round( (n() / total_records) * 100 , 2 ) 
-  ) |>
-  arrange(desc(count))
+    .groups = "drop"
+  ) %>%
+  mutate(
+    percentage = round((count / sum(count)) * 100, 2)
+  ) %>%
+  arrange(desc(count)) %>%
+  bind_rows(
+    tibble(
+      identification_taxon = "Total",
+      count = sum(.$count),
+      percentage = 100
+    )
+  )
 
 View(species_summary)
+
+# write.csv(
+#   species_summary,
+#   "species_summary.csv",
+#   row.names = FALSE
+# )
 
 abdominal_stage_summary <- data |>
   group_by(abdominal_stage) |>
@@ -40,19 +61,17 @@ View(abdominal_stage_summary)
 
 
 # Write results to CSV
-write.csv(species_summary, "species_summary.csv", row.names = FALSE)
-write.csv(abdominal_summary, "abdominal_summary.csv", row.names = FALSE)
+# write.csv(species_summary, "species_summary.csv", row.names = FALSE)
+# write.csv(abdominal_summary, "abdominal_summary.csv", row.names = FALSE)
 
 
 
-# load packages
-library(tidyverse)
-library(readr)
+# # load packages
+# library(tidyverse)
+# library(readr)
 
 # load raw entomological database
-raw_data <- read_csv(
-  "data/raw/kc_entomo_database.csv"
-)
+raw_data <- data
 
 # create household species counts
 counts <- raw_data %>%
@@ -79,7 +98,7 @@ counts <- raw_data %>%
 View(counts)
 
 # save clean counts dataset
-write_csv(
-  counts,
-  "data/clean/kc_household_counts.csv"
-)
+# write_csv(
+#   counts,
+#   "data/clean/kc_household_counts.csv"
+# )
