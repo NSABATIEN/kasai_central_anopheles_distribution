@@ -4,7 +4,7 @@
 # and visualisation.
 
 # Data wrangling and quality control
-library(tidyverse) # Data manipulation, visualisation, and workflow tools
+library(tidyverse) # dplyr, tidyr, ggplot2, purrr, readr, tibble, etc.
 library(readxl) # Import Excel spreadsheets
 library(janitor) # Clean and standardise column names
 library(naniar) # Explore and visualise missing data
@@ -29,6 +29,8 @@ library(ggh4x) # Advanced extensions for ggplot2
 library(idpalette) # TheKids colour palettes for better quality plots
 library(ggnewscale) # Allow multiple colour/fill scales in the same ggplot
 library(ggspatial) # Add map elements such as north arrows and scale bars
+library(scales) # Scaling functions used by ggplot2
+library(ggtext) # Markdown and HTML formatting in ggplot text
 
 # Spatial ecology and SDM utilities
 library(sdmtools) # Spatial and SDM evaluation tools (e.g., distances, metrics)
