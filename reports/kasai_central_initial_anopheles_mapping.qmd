@@ -1,0 +1,408 @@
+---
+title: " MESS analysis prior *Anopheles* distribution mapping in Kasaï-Central"
+format: pdf
+editor: visual
+author: "Victoire Nsabatien & all supervisors"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+# 1. Introduction
+
+This document presents the Multivariate Environmental Similarity Surface (MESS) analysis conducted prior to the preliminary mapping of *Anopheles* distribution in Kasaï-Central.
+
+Before conducting the MESS analysis, environmental covariates were drawn from `geodata` using the WorldClim bioclimatic and global landcover datasets.
+
+The principal component analysis (PCA) was applied separately to the climatic and landcover datasets to reduce redundancy and summarise the environmental variation that can explain 90% of the climatic and landscape variation across Kasaï-Central.
+
+```{r load-packages, include=FALSE,message=FALSE, warning=FALSE}
+library(dplyr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+library(geodata)
+library(readr)
+library(cowplot)
+library(idpalette)
+library(mgcv)
+library(sf)
+library(janitor)
+```
+
+```{r load-household-coordinates,include=FALSE}
+coords <- read_csv(
+  "data/clean/kc_household_coords.csv",
+  col_types = cols(
+    health_zone = col_character(),
+    health_area = col_character(),
+    village = col_character(),
+    house_number = col_character(),
+    lat_dd = col_double(),
+    long_dd = col_double()
+  )
+)
+
+```
+
+```{r load-covariates, include=FALSE}
+covs <- terra::rast("data/clean/covariates.tif")
+```
+
+```{r load-drc-boundaries,include=FALSE}
+drc <- geodata::gadm("COD", level = 0)
+drc_l1 <- geodata::gadm("COD", level = 1)
+drc_l2 <- geodata::gadm("COD", level = 2)
+```
+
+```{r select-kasai-central,include=FALSE, message=FALSE, warning=FALSE}
+kc <- drc_l1 |>
+  filter(NAME_1 == "Kasaï-Central")
+
+health_zones <- sf::st_read(
+  "data/downloads/grid3/grid3_cod_health_zones_v8_0.gpkg"
+) |>
+  janitor::clean_names()
+
+kc_hz <- health_zones |>
+  filter(province == "Kasaï-Central")
+```
+
+## 2. Surveyed household locations
+
+Surveys are located in the south-central of the country sharing a partial border with Angola.
+
+```{r surveyed-household-locations}
+#| fig-cap: "Surveyed household locations in Kasaï-Central are shown as pink points. In the national map, the thick black line represents the national border, and Kasaï-Central is highlighted within the DRC. In the inset map, thick black lines represent the Kasaï-Central provincial boundary, while lighter grey lines represent health-zone boundaries across the province."
+
+# p1 <- ggplot() +
+#   geom_spatvector(
+#     data = kc_hz,
+#     fill = "grey98",
+#     col = "grey85",
+#     linewidth = 0.15
+#   ) +
+#   geom_spatvector(
+#     data = sf::st_union(kc_hz),
+#     fill = NA,
+#     col = "black",
+#     linewidth = 0.9
+#   ) +
+#   geom_point(
+#     data = coords,
+#     aes(x = long_dd, y = lat_dd),
+#     col = "hotpink",
+#     size = 0.7,
+#     alpha = 0.85
+#   ) +
+#   theme_void()
+
+p2 <- ggplot() +
+  geom_spatvector(
+    data = drc_l1,
+    fill = "grey98",
+    col = "grey30",
+    linewidth = 0.25
+  ) +
+  geom_spatvector(
+    data = drc,
+    fill = "transparent",
+    col = "grey10",
+    linewidth = 0.8
+  ) +
+  geom_spatvector(
+    data = kc,
+    fill = "grey98",
+    col = "grey10",
+    linewidth = 0.7
+  ) +
+  geom_point(
+    data = coords,
+    aes(x = long_dd, y = lat_dd),
+    col = "hotpink",
+    size = 0.6
+  ) +
+  theme_void()
+print(p2)
+
+# cowplot::ggdraw(p2) +
+#   cowplot::draw_plot(
+#     p1,
+#     x = 0.38,
+#     y = 0,
+#     width = 0.62,
+#     height = 0.62
+#   )
+```
+
+```{r}
+p2 <- ggplot() +
+  geom_spatvector(
+    data = drc_l1,
+    fill = "grey98",
+    col = "grey30",
+    linewidth = 0.25
+  ) +
+  geom_spatvector(
+    data = drc,
+    fill = "transparent",
+    col = "grey10",
+    linewidth = 0.8
+  ) +
+  geom_spatvector(
+    data = kc,
+    # highlight color for the study province
+    fill = "#028090",
+    col = "grey10",
+    linewidth = 0.7
+  ) +
+  theme_void()
+print(p2)
+```
+
+```{r}
+ggsave(
+ filename = "kasai_central_study_area.png",
+ plot = p2,
+ width = 8,
+ height = 6,
+ units = "in",
+ dpi = 300,
+ bg = "white"
+)
+```
+
+# 3. Multivariate Environmental Similarity Surface (MESS)
+
+The Multivariate Environmental Similarity Surface (MESS) analysis was conducted to assess how similar environmental conditions across Kasaï-Central are to those observed at the surveyed household locations.
+
+Areas with positive MESS values represent environments similar to sampled conditions, while negative values indicate environments that are environmentally different from the sampled locations. Strongly negative values highlight areas where model predictions may be less reliable because environmental conditions were not well represented in the survey data.
+
+```{r extract-household-covariates-for-mess,include=FALSE}
+coord_covs <- covs |>
+  terra::extract(
+    dplyr::select(coords, long_dd, lat_dd),
+    ID = FALSE
+  )
+```
+
+```{r prepare-mess-covariates,include=FALSE}
+coord_covs_clean <- coord_covs |>
+  dplyr::select(
+    bioclim_pc1:landcover_pc5
+  )
+```
+
+```{r run-mess-analysis,include=FALSE, warning=FALSE, message=FALSE}
+covraster <- raster::brick("data/clean/covariates.tif")
+
+mess_drc <- dismo::mess(
+  x = covraster,
+  v = coord_covs_clean
+) |>
+  terra::rast()
+```
+
+```{r clean-mess-values,include=FALSE}
+mess_drc_plot <- mess_drc
+
+mess_drc_plot[
+  is.infinite(values(mess_drc_plot))
+] <- NA
+```
+
+## MESS map with surveyed households
+
+The MESS map compares environmental conditions across Kasaï-Central with the environmental conditions observed at the surveyed households.
+
+```{r plot-mess-local-coords}
+#| fig-cap: "MESS analysis compares environmental conditions across Kasaï-Central with environmental conditions observed at surveyed household locations. Pink dots represent surveyed households. Blue areas indicate environments similar to sampled conditions, while red areas represent environments less similar to sampled conditions "
+
+mess_drc_plot <- mess_drc
+
+mess_drc_plot[
+  is.infinite(values(mess_drc_plot))
+] <- NA
+
+mess_drc_plot <- terra::mask(
+  mess_drc_plot,
+  terra::vect(kc_hz)
+)
+
+mess_limit <- max(
+  abs(values(mess_drc_plot)),
+  na.rm = TRUE
+)
+
+plot_mess_local_coords <- ggplot() +
+  geom_spatraster(
+    data = mess_drc_plot
+  ) +
+  scale_fill_distiller(
+    type = "div",
+    palette = "RdBu",
+    direction = 1,
+    limits = c(-mess_limit, mess_limit),
+    na.value = NA
+  ) +
+  geom_sf(
+    data = kc_hz,
+    fill = NA,
+    col = "grey75",
+    linewidth = 0.12
+  ) +
+  geom_sf(
+    data = sf::st_union(kc_hz),
+    fill = NA,
+    col = "black",
+    linewidth = 0.7
+  ) +
+  geom_point(
+    data = coords,
+    aes(x = long_dd, y = lat_dd),
+    col = "black",
+    size = 1.5
+  ) +
+  theme_void() +
+  labs(
+    fill = "Multivariate\nEnvironmental\nSimilarity"
+  )
+
+plot_mess_local_coords
+```
+
+The MESS map shows that most surveyed household locations are located within environmentally similar areas across Kasaï-Central. However, some areas, particularly in northern and eastern parts of the province, showed more negative MESS values, indicating environments that were less represented in the sampled household locations.
+
+Predictions made in these areas during later spatial modelling may therefore be less reliable because they involve greater environmental extrapolation beyond the sampled environmental conditions.
+
+## 4. Environmental dissimilarity map
+
+The environmental dissimilarity map is based on the Elith et al. Multivariate Environmental Similarity Surface Where 1 represent environments similar to the surveyed household locations, and \>1 represent environments different from the sampled environmental conditions, and greater numbers indicate greater dissimilarity.
+
+```{r create-environmental-dissimilarity-local, include=FALSE}
+
+# Remove infinite values from the MESS raster
+
+mess_drc_clean <- mess_drc
+
+mess_drc_clean[
+  is.infinite(values(mess_drc_clean))
+] <- NA
+
+# Create the mathematical reverse of the MESS raster
+mess_reverse <- -mess_drc_clean
+
+# Shift values so the minimum starts at 0
+dissimilarity_local <- mess_reverse -
+  terra::global(
+    mess_reverse,
+    min,
+    na.rm = TRUE
+  )[1, 1]
+
+# Apply log transformation to improve visual contrast
+dissimilarity_local <- log10(
+  dissimilarity_local + 1
+)
+
+# Compare value ranges across transformation steps
+value_ranges <- data.frame(
+  raster = c(
+    "MESS similarity",
+    "MESS reverse",
+    "Environmental dissimilarity"
+  ),
+  minimum = c(
+    terra::global(
+      mess_drc_clean,
+      "min",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      mess_reverse,
+      "min",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      dissimilarity_local,
+      "min",
+      na.rm = TRUE
+    )[1, 1]
+  ),
+  maximum = c(
+    terra::global(
+      mess_drc_clean,
+      "max",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      mess_reverse,
+      "max",
+      na.rm = TRUE
+    )[1, 1],
+
+    terra::global(
+      dissimilarity_local,
+      "max",
+      na.rm = TRUE
+    )[1, 1]
+  )
+)
+```
+
+## Environmental dissimilarity map across Kasaï-Central
+
+```{r plot-environmental-dissimilarity-local}
+#| fig-cap: "Environmental dissimilarity across Kasaï-Central. Pink dots represent surveyed households. Darker areas indicate environments increasingly different from sampled conditions."
+
+ggplot() +
+  geom_spatraster(
+    data = dissimilarity_local
+  ) +
+  scale_fill_gradient(
+    low = "grey90",
+    high = "grey30",
+    na.value = "white",
+    limits = c(0, 3)
+  ) +
+  theme_void() +
+  geom_point(
+    data = coords,
+    aes(
+      x = long_dd,
+      y = lat_dd
+    ),
+    col = "hotpink"
+  ) +
+  labs(
+    fill = "Multivariate\nEnvironmental\nDissimilarity"
+  )
+```
+
+The environmental dissimilarity map shows that most surveyed household locations are located within areas of relatively low environmental dissimilarity. This suggests that the sampled households capture many of the environmental conditions present across Kasaï-Central.
+
+Greater numbers, particularly in parts of northern and eastern Kasaï-Central, represent environments increasingly different from the sampled household conditions (potential gaps in entomological collection).
+
+Additional sampling collections in these areas could help improve environmental representativeness and reduce uncertainty.
+
+# 5. Summary
+
+The MESS analysis showed that most surveyed household locations captured the dominant environmental conditions present across Kasaï-Central. As a result, much of the province falls within the environmental range represented by the survey data, providing a suitable basis for subsequent spatial modelling.
+
+However, some areas, particularly in northern and eastern Kasaï-Central, exhibited environmental conditions that were less well represented by the sampled household locations. These areas showed greater environmental dissimilarity and may therefore require greater environmental extrapolation during spatial prediction.
+
+These environmentally distinct areas may also indicate potential gaps in entomological surveillance. Additional mosquito collections in these locations could improve environmental representativeness, reduce extrapolation uncertainty, and strengthen future spatial modelling efforts across the province.
+
+Future work will use these environmental data to investigate the environmental factors associated with hotspots of *Anopheles gambiae* s.l. and *Anopheles funestus* gr across Kasaï-Central.
+
+Additional analyses could also explore the environmental drivers of malaria vector species diversity, particularly in areas showing unusually high species richness, such as Bobozo and Dibaya health zones.
+
+In addition to environmental variables, vector intervention variables such as ITN coverage and ITN usage (PBO and dual AI. nets) could be incorporated into future analyses to improve understanding of spatial variation in malaria vector abundance across the province.
